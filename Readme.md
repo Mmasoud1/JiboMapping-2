@@ -1,11 +1,13 @@
   
 # Jibo Mapping Task. 
+
+## Online Demo
   
-## Setup
+## Local Setup
 
 To have a local setup, follow these steps please:
 
-    -Navigate to the root directory of JiboMappingLast folder .
+    -Navigate to the root directory of JiboMapping-2 folder .
 
     -From the terminal or command line, execute the following command to start the HTTP server:
 
