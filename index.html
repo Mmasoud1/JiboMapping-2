@@ -1,0 +1,1702 @@
+<!-- 
+=========================================================
+* Jibo Data Mapping Demo 
+=========================================================
+
+* @see {@link  (Github link to add here)}
+* @description   Analytical tool for Jibo project collected data
+*
+* @version 1.0.0 
+*
+* @author Mohamed Masoud,   PI:  Dr. Robert Morris
+=========================================================
+* @file             Jibo Mapping
+=========================================================
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Jibo Mapping</title>
+  <link rel="shortcut icon" href="#">
+  <link rel="stylesheet" type="text/css" href="/js/libs/webix/webix.css">
+
+  <script src="https://d3js.org/d3.v4.min.js"></script>
+  <script src="https://d3js.org/d3-selection-multi.v0.4.min.js"></script>
+  <script src="/js/libs/webix/webix.js"></script>
+  <script src="https://code.jquery.com/jquery-3.3.1.js" integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60=" crossorigin="anonymous"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js" type="text/javascript"></script>
+  <script type="text/javascript" src="http://d3js.org/d3.v3.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/promise-polyfill@7/dist/polyfill.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/2.0.3/fetch.js"></script>
+  <!-- bundle for panda like   https://danfo.jsdata.org/-->
+  <script src="https://cdn.jsdelivr.net/npm/danfojs@1.1.2/lib/bundle.js"></script>
+  <script src="js/libs/Dropbox-sdk.min.js"></script>
+  <script src="js/libs/jquery-3.5.1.js"></script>
+  <script src="js/libs/papaparse.min.js"></script>  
+
+<style>
+  /*table, th, td {
+    border: 1px solid black;
+    border-collapse: collapse;
+  }*/
+
+  th, td {
+    border-style:solid;
+    border-color: #96D4D4;
+  }
+
+  .my-popup {
+    bottom: 20px !important;
+    right: 20px !important;
+    max-width: 20vw;
+  }
+
+
+/* For tabview, change this color as needed */
+.webix_el_tabbar .webix_item_tab.webix_selected {
+  background-color: #2596be; /* Selected tab background color */
+  border-color: #2596be; /* Selected tab border color */
+  color: white !important; /* Selected tab text color */
+}
+
+.webix_item_tab .webix_icon {
+  font-size: 14px;
+}
+
+.webix_el_tabbar .webix_item_tab {
+  border-color: white;
+  color: black; /* Unselected tab text color */
+  background-color: white; /* Unselected tab background color */
+  font-size: 14px;
+}
+
+/* Remove hover effect */
+.webix_el_tabbar .webix_item_tab:hover {
+  background-color: white;
+  color: black; /* Ensure text color remains black */
+}
+
+/* Ensure selected tab retains background color and text color on hover */
+.webix_el_tabbar .webix_item_tab.webix_selected:hover {
+  background-color: #2596be;
+  border-color: #2596be;
+  color: white !important; /* Ensure text color remains white */
+}
+
+/* Ensure selected tab retains background color and text color when not hovered */
+.webix_el_tabbar .webix_item_tab.webix_selected {
+  color: white !important; /* Ensure text color remains white */
+}
+
+.webix_after_all_tabs {
+  display: none;
+}
+
+
+
+</style>
+
+
+</head>
+  
+<body>
+ 
+  <script>
+
+
+
+  /**
+   *  Function to convert datetime string to a Date object
+   *
+   * @function
+   * @memberof Jibo
+   * @since 1.0.0
+   * @version 1.0.0
+   * @param {string} datetimeString
+   * @returns {Date object} 
+   * @example 
+   *
+   * parseDatetime( '2020-12-11-17-35-21' )
+   * 
+   * => Date Fri Dec 11 2020 17:35:21 GMT-0500 (Eastern Standard Time)
+   *   
+   */ 
+
+    parseDatetime = (datetimeString) => {
+      let parts = datetimeString.split('-');
+      let year = parseInt(parts[0], 10);
+      let month = parseInt(parts[1], 10) - 1; // Month is 0-indexed in JavaScript Date
+      let day = parseInt(parts[2], 10);
+      let hour = parseInt(parts[3], 10);
+      let minute = parseInt(parts[4], 10);
+      let second = parseInt(parts[5], 10);
+      return new Date(year, month, day, hour, minute, second);
+    }
+
+
+
+  /**
+   *  Function to convert time in milliseconds to  HH:MM:SS format
+   *
+   * @function
+   * @memberof Jibo
+   * @since 1.0.0
+   * @version 1.0.0
+   * @param {number} millisecTime
+   * @returns {string}   HH:MM:SS format
+   * @example 
+   *
+   * let date1 = parseDatetime('2020-12-11-17-35-21');
+   * let date2 = parseDatetime('2020-12-11-17-35-24');
+   * let Diff = date2 - date1;
+   * => 3000
+   *
+   * formatTime( 3000 )
+   * 
+   * => "00:00:03"
+   *   
+   */ 
+
+    formatTime = (millisecTime) => {
+       // Convert milliseconds to hours, minutes, and seconds
+      let seconds = Math.floor(millisecTime / 1000);
+      let minutes = Math.floor(seconds / 60);
+      seconds = seconds % 60;
+      let hours = Math.floor(minutes / 60);
+      minutes = minutes % 60;
+
+      // Format the millisecTime as HH:MM:SS
+      let formattedDifference = [
+          hours.toString().padStart(2, '0'),
+          minutes.toString().padStart(2, '0'),
+          seconds.toString().padStart(2, '0'),
+        ].join(':');
+
+      return formattedDifference; 
+    }
+
+    
+  /**
+   *  Function to remove objects with duplicate Datetime values
+   *
+   * @function
+   * @memberof Jibo
+   * @since 1.0.0
+   * @version 1.0.0
+   * @param {Array} objectsArray
+   * @returns {Array}   
+   * @example 
+   *
+   * let objectsArr = [
+       { id: 1, Datetime: '2020-12-11-17-35-21', name: 'Object A' },
+       { id: 2, Datetime: '2020-12-11-17-35-24', name: 'Object B' },
+       { id: 3, Datetime: '2020-12-12-17-35-21', name: 'Object C' }, // <<< Duplicate 
+       { id: 4, Datetime: '2020-12-12-17-35-21', name: 'Object D' },       
+       { id: 5, Datetime: '2020-12-12-17-35-21', name: 'Object E' }
+     ];
+   *
+   * removeDuplicatesByKey( objectsArr, "Datetime" )
+   * 
+   * => [{ id: 1, Datetime: "2020-12-11-17-35-21", name: "Object A" }, 
+         { id: 2, Datetime: "2020-12-11-17-35-24", name: "Object B" },
+         { id: 4, Datetime: "2020-12-12-17-35-21", name: "Object C" } ]
+   *   
+   */ 
+
+    removeDuplicatesByKey = (objectsArray, key2filter) => {
+      const seenDatetime = new Set();
+      return objectsArray.filter(obj => {
+        if (seenDatetime.has(obj[key2filter])) {
+          return false; // If datetime has been seen, filter out the object
+        } else {
+          seenDatetime.add(obj[key2filter]); // Add unseen datetime to the Set
+          return true; // Keep the object in the array
+        }
+      });
+    }
+
+
+    // Function to remove the first encountered object in case of a duplicate datetime
+    removeFirstDuplicateByKey = (objectsArray, key2filter) => {
+      const seenDatetime = new Set();
+      // Reverse the array to ensure the last occurrence is kept
+      const reversedObjects = [...objectsArray].reverse();
+      const filteredReversedObjects = reversedObjects.filter(obj => {
+        if (seenDatetime.has(obj[key2filter])) {
+          // If datetime has been seen, filter out this object (which is actually the first one in original order)
+          return false;
+        } else {
+          // Mark this datetime as seen and keep the object (this will remove the first one in original order)
+          seenDatetime.add(obj[key2filter]);
+          return true;
+        }
+      });
+      // Reverse the array again to restore original order with duplicates removed
+      return filteredReversedObjects.reverse();
+    }
+
+
+
+ 
+
+
+  /**
+   *  Convert CSV content to JSON 
+   *  Set header true to convert it as json object not as an array 
+   *  Set dynamicTyping true to make numbers show as numerical not strings, ex. show as 0 not "0"
+   *
+   * @function
+   * @memberof Jibo
+   * @since 1.0.0
+   * @version 1.0.0
+   * @param {string} csvContent
+   * @returns {Array} Array of objects
+   * @example 
+   *
+   *
+   *
+   * convertCsv2Json( fetchRemoteCsv("./combined104.csv") )
+   * 
+   * => Array(377) [ { Datetime: "2020-12-11-17-35-03", "Event type": "TUTORIAL_COMMAND", Message: '{"tutorial_mode": true', … }, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, … ]
+   *   
+   */  
+
+  convertCsv2Json = (csvContent) => {
+       // header true to convert it as json object not as an array
+       return Papa.parse(csvContent, { skipEmptyLines: true, header: true, dynamicTyping: true}).data;
+
+  }
+
+
+    /**
+    * Fetch csv data from csv file stored locally or remotely  
+    *
+    * @since 1.0.0
+    * @param {string} csvURL 
+    * @example
+    *
+    * fetchRemoteCsv("./combined104.csv")
+    *
+    */  
+
+    fetchRemoteCsv = (csvURL) => {
+        let csvDataObj; 
+        $.ajax({
+              url: csvURL,
+              async: false,
+              dataType: 'text',
+              success: function (response) {
+                csvDataObj = response  
+                //-- csvDataObj  'key1, key2
+                //--              val1, val2'    
+              }
+            });
+
+         return csvDataObj ? csvDataObj : null ;
+
+    }
+
+
+    /**
+    * Convert JSON to table  
+    *
+    * @since 1.0.0
+    * @param {object} jsonData 
+    * @param {string} tableId
+    * @param {bool} enableRank    
+    *
+    */  
+
+    // Function to convert JSON or CSV data to Webix datatable data with dynamic columns
+    function convert2Table(jsonData, tableId, enableRank, adjustType) {
+      // Get the Webix datatable
+      let datatable = $$(tableId);
+
+      if (datatable) {
+        // Show progress overlay
+        webix.extend(datatable, webix.ProgressBar);
+        datatable.showProgress({
+          type: "top"
+        });
+
+        // Use setTimeout to simulate a delay for processing the CSV
+        setTimeout(function() {
+          // Extract column names dynamically from JSON data
+          let columns = Object.keys(jsonData[0]).map(key => ({
+            id: key,
+            header: key,
+            adjust: adjustType // "header": Adjust width based on header text,  true: Enable auto width adjustment for columns
+          }));
+
+
+          if(enableRank) {
+              // Add the rank column at the beginning
+              columns.unshift({
+                id: "rank",
+                header: "#",
+                template: function(obj, common, value, config, index) {
+                  return index + 1;
+                },
+                width: 50
+              });
+          }          
+
+          // Clear any existing configuration and data
+          datatable.clearAll();
+          datatable.config.columns = columns;
+
+          // Reconfigure the datatable with new columns and refresh it
+          datatable.refreshColumns();
+
+          // Parse the JSON data into the datatable
+          datatable.parse(jsonData);
+
+          // Hide progress overlay
+          datatable.hideProgress();
+        }, 100); // Adjust the delay as needed
+      }
+    }
+
+
+
+
+  // Function to convert JSON or CSV data to HTML table
+   convert2Table_old = (jsonData, containerId) => {
+
+    // Ensure the container is visible and rendered
+    webix.ui.$$(containerId).show();
+
+    // Get the container element where the table will be inserted
+    let container = $("#" + containerId);
+
+    // Clear any existing content in the container
+    container.empty();
+
+    // Create the table element
+    let table = $("<table>");
+
+    // Get the keys (column names) of the first object in the JSON data
+    let cols = Object.keys(jsonData[0]);
+
+    // Create the header element
+    let thead = $("<thead>");
+    let tr = $("<tr>");
+
+    // Loop through the column names and create header cells
+    $.each(cols, function(i, item) {
+      let th = $("<th>");
+      th.text(item); // Set the column name as the text of the header cell
+      tr.append(th); // Append the header cell to the header row
+    });
+
+    thead.append(tr); // Append the header row to the header
+    table.append(thead); // Append the header to the table
+
+    // Loop through the JSON data and create table rows
+    $.each(jsonData, function(i, item) {
+      let tr = $("<tr>");
+
+      // Get the values of the current object in the JSON data
+      let vals = Object.values(item);
+
+      // Loop through the values and create table cells
+      $.each(vals, function(i, elem) {
+        let td = $("<td>");
+        td.text(elem); // Set the value as the text of the table cell
+        tr.append(td); // Append the table cell to the table row
+      });
+      table.append(tr); // Append the table row to the table
+    });
+
+    container.append(table); // Append the table to the container element
+  }
+
+
+   ////////////////////////////////////////
+   ///////////------Mapping-------/////////
+  ////////////////////////////////////////
+
+
+    /**
+    * Map raw data to new sheet  
+    *
+    * @since 1.0.0
+    * @param {object} jsonData 
+    * @param {string} tableId
+    * @param {bool} enableRank    
+    *
+    */  
+
+   jiboMapping = (rawJsonData, rawStoryBookState, rawJiboState) => {
+
+      
+      //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD", 
+      //                     Message: null, "": null, _1: null, _2: null, _3: null, _4: null }      
+      
+      //-- rawStoryBookState[0] :{ Datetime: "2020-12-11-17-35-29",  audio_playing:  False, audio_file:  "chicka_chicka_boom_boom-01-01.wav",  storybook_mode: "EXPLORE_MODE", page number:  16 }      
+      
+      //-- rawJiboState[0] :{ Datetime: "2020-12-11-17-41-39",  in_motion: "" , audio:  "",  tts_msg: "Look at all those storybooks!", volume:   "and selecting the book you want to read", led_color: "NO DATA", lookat: NO DATA , doing_motion: True , is_playing_sound: True ,  is_listening: False }
+
+
+        // To get story titles and thier total page numbers
+        let allStoryTitles = [];
+
+        for(let i = 0; i < rawStoryBookState.length; i++) {
+           if(rawStoryBookState[i]["audio_file"] != null && rawStoryBookState[i]["audio_file"].includes("-title.wav")) {
+
+               allStoryTitles.push({"audio_file": rawStoryBookState[i]["audio_file"].split("-title.wav")[0], 
+                                     "page number" : rawStoryBookState[i]["page number"]  })
+
+           }
+
+        }
+
+        // remove duplicates
+        allStoryTitles = removeFirstDuplicateByKey( allStoryTitles, "audio_file" );  
+        //-- allStoryTitles ->[ { audio_file: "chicka_chicka_boom_boom", "page number": 16 },
+        //                      { audio_file: "farm_animals", "page number": 12 } ]
+
+
+        // Map total page number of each story
+        const totalPageNumberObj = allStoryTitles.reduce((accumulator, current) => {
+            accumulator[current.audio_file] = current["page number"];
+            return accumulator;
+        }, {});
+
+        //-- totalPageNumberObj : {"chicka_chicka_boom_boom" : 16, "farm_animals" : 12,
+        //                      "geraldine_the_music_mouse" : 15, "the_little_red_hen-muldrow": 22 };
+
+
+        // To get story titles and each page and line read.
+        let storyBookStatePageLine = [];
+
+        for(let i = 0; i < rawStoryBookState.length; i++) {
+        
+           if( rawStoryBookState[i]["audio_file"] != null && 
+              !rawStoryBookState[i]["audio_file"].includes("-title.wav") &&   
+               rawStoryBookState[i]["audio_file"].includes(".wav") ) {
+
+               storyBookStatePageLine.push({
+                   "Datetime" : rawStoryBookState[i]["Datetime"],
+                   "storyTitle": rawStoryBookState[i]["audio_file"].split(".wav")[0].split("-")[0], 
+                   "curPage" :rawStoryBookState[i]["audio_file"].split(".wav")[0].split("-").slice(-2)[0], 
+                   "curLine" :rawStoryBookState[i]["audio_file"].split(".wav")[0].split("-").slice(-1)[0] })
+           }
+
+        }
+
+        // Remove duplicates date from story page line sheet
+        storyBookStatePageLine = removeFirstDuplicateByKey( storyBookStatePageLine, "Datetime" ); 
+
+
+        getStoryBookObjByDateTime = (dateTime) => {
+                let filteredResults = storyBookStatePageLine.filter(obj => obj["Datetime"] === dateTime);
+                return filteredResults.length === 0 ? null:  filteredResults[0];
+        }
+
+
+        // To get Jibo states and all Asked question 
+        let allJiboTalk = [];
+       //-- rawJiboState[0] :{ Datetime: "2020-12-11-17-41-39",  in_motion: "" , audio:  "",  tts_msg: "Look at all those storybooks!", volume:   "and selecting the book you want to read", led_color: "NO DATA", lookat: "NO DATA" , doing_motion: True , is_playing_sound: True ,  is_listening: False }        
+
+        for(let i = 0; i < rawJiboState.length; i++) {
+           if(rawJiboState[i]["tts_msg"] != null) {
+                // To remove any "<..>" e.g. "<break size=0.2/>"
+               let ttsMsg = rawJiboState[i]["tts_msg"].replace(/<[^>]*>/g, '');
+               ttsMsg = ttsMsg !== "Sup" ? ttsMsg : "";
+
+               let volMsg = "";
+               let ledColorMsg = "";
+               let lookAtMsg = ""
+
+
+               if(rawJiboState[i]["volume"] != null && rawJiboState[i]["volume"] != 0 && rawJiboState[i]["volume"] != "0") {
+                   // To remove "Bryson . "  and any "<..>"
+                   volMsg = rawJiboState[i]["volume"].replace(/<[^>]*>/g, '').replace(/Bryson \. /g, '');
+               }
+
+               if(rawJiboState[i]["led_color"] != null && rawJiboState[i]["led_color"] != "NO DATA" && rawJiboState[i]["led_color"] != 0 && rawJiboState[i]["led_color"] != "0") {
+
+                   ledColorMsg = rawJiboState[i]["led_color"].replace(/<[^>]*>/g, '');
+               }
+
+
+               if(rawJiboState[i]["lookat"] != null && rawJiboState[i]["lookat"] != "NO DATA" && rawJiboState[i]["lookat"] != 0 && rawJiboState[i]["lookat"] != "0") {
+
+                   lookAtMsg = rawJiboState[i]["lookat"].replace(/<[^>]*>/g, '');
+               }               
+
+               let jiboTalk =  ttsMsg + volMsg + ledColorMsg + lookAtMsg;
+               let isQuestion = jiboTalk.includes("?") ? true : false; 
+                
+               allJiboTalk.push({"Datetime": rawJiboState[i]["Datetime"] , 
+                                          "jiboTalk": jiboTalk, "isQuestion" : isQuestion });
+
+           }
+
+        }
+
+        // remove duplicates
+        allJiboTalk = removeFirstDuplicateByKey( allJiboTalk, "Datetime" );  
+        //-- allJiboTalk[0] ->{ Datetime: "2020-12-11-18-00-27", jiboTalk: "Give it a try! I believe in you. a farmer uses animals to protect the sheep make wool cloths make milk make meat and so on. That's a lot of animals!", isQuestion: false }
+        //  
+
+        getJiboStateObjByDateTime = (dateTime) => {
+                let filteredResults = allJiboTalk.filter(obj => obj["Datetime"] === dateTime);
+                return filteredResults.length === 0 ? null:  filteredResults[0];
+        }
+
+
+        let rawDataKeys = Object.keys(rawJsonData[0]);
+        //-- rawDataKeys : Array(8) [ "Datetime", "Event type", "Message", "", "_1", "_2", "_3", "_4" ]
+
+
+
+        newSheetObj = {"Participant" : null, "Datetime" : null, "Date" : null, "Time" : null, 
+                      "Storybook Selected" : null, "Total Page Number" : null, "Page Number" : null, 
+                      "Line" : null, "Automatic Storytelling vs Selected Storytelling " : "", 
+                      "Seconds" : null, "Time Stopes" : "", "Time Reading " : "", "Paused" : "", 
+                      "Total Time Reading" : "",  "Total Time Paused" : "", "Total Time in Storybook" : "",  
+                      "Tutorial Response" : "",  "Tutorial Command" : "", "NEXT_PAGE Tapped " : "", 
+                      "Index/ Line Word Tapped " : "",  "Word Tapped " : "",  "Scene Object Tapped" : "", 
+                      "Jibo buttom pressed" : "", "Jibo Asked Question" : "", "Jibo Command" : "",  
+                      "Transcription or word/ image tapped " : "",  "No Response to Jibo" : "",  
+                      "Confidence level " : "", "Return to library Early" : "", "Finished Storybook" : "",
+                       "Student Logout" : "" }
+
+
+
+        let cleanDataKeys = Object.keys(newSheetObj);
+        //-- rawKeys : Array(31) [ "Participant", "Datetime", "Date", "Time", "Storybook Selected"...]
+
+
+
+        // Find HELLO_WORLD indexes, start and end of each session
+        let helloWorldStarts = [];
+        // e.g. Array(4) [ 0, 21, 27, 206 ]  indices where HELLO_WORLD started
+
+        rawJsonData.forEach((jsonRow, idx) => { // idx starts with 0
+        //e.g. jsonRow :  { Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD", Message: null, "": null, _1: null, _2: null, _3: null, _4: null }
+
+            if(jsonRow["Event type"] === "HELLO_WORLD") {
+               helloWorldStarts.push(idx);
+            }
+
+        });
+
+        console.log("HELLO_WORLD starts indices : ", helloWorldStarts);
+
+
+
+        let helloWorldSessions = [];
+        // e.g. Array(4) [ { session: 1, start: 0, end: 20, stories: null },
+        //                 { session: 2, start: 21, end: 26, stories: null }, 
+        //                 { session: 3, start: 27, end: 205, stories: null },  
+        //                 { session: 4, start: 206, end: 376, stories: null } ]    
+
+        // Each session starts with HELLO_WORD and  ends just befor next HELLO_WORLD or by the end of the sheet //.                                                                        
+
+
+        for (let i = 0; i < helloWorldStarts.length; i++) { // arrIndex starts with 0
+
+            if(i < (helloWorldStarts.length -1) ) {
+               helloWorldSessions.push({session: i+1, start: helloWorldStarts[i], end: helloWorldStarts[i+1] - 1, stories: [] });
+            } else {
+               helloWorldSessions.push({session: i+1, start: helloWorldStarts[i], end: rawJsonData.length - 1, stories: [] });
+            }
+        };
+
+        console.log("helloWorldSessions :",  helloWorldSessions);
+
+        // e.g. Array(4) [ { session: 1, start: 0, end: 20, stories: null },
+        //                 { session: 2, start: 21, end: 26, stories: null }, 
+        //                 { session: 3, start: 27, end: 205, stories: null },  
+        //                 { session: 4, start: 206, end: 376, stories: null } ]   
+
+        // Each session starts with HELLO_WORD and  ends just befor next HELLO_WORLD or by the end of the sheet //  
+
+
+        // For STORY_LOAD subsession till next STORY_LOAD within the same HELLO_WORLD session
+
+
+        helloWorldSessions.forEach((session, idx) => { // idx starts with 0
+
+            let storyLoadSessions = [];
+            let storyNames = [];            
+
+            for(let i = session.start; i <= session.end; i++ ) {
+
+               if( rawJsonData[i]["Event type"] === "STORY_LOADED" ) {
+
+                   storyLoadSessions.push({rawSheetIdx: i, Datetime: rawJsonData[i]["Datetime"]})   
+
+               }
+
+               if( rawJsonData[i]["_3"] != null && rawJsonData[i]["_3"].includes("story_name") && !rawJsonData[i]["_3"].includes("[]") ) {
+                    
+                    let rawStoryName = rawJsonData[i]["_3"].split(":")[1].split("}")[0];
+ 
+                    // test for single quote (') e.g. :  '"chicka_chicka_boom_boom"'
+                    if( /['"]/.test( rawStoryName ) ) {  
+                        // if true (exist), remove single quote 
+                        rawStoryName = rawStoryName.replace(/['"]/g, "")
+                        //  '"chicka_chicka_boom_boom"'  ->  "chicka_chicka_boom_boom"
+                    }
+
+                    storyNames.push( rawStoryName );
+               }               
+
+            }
+
+           session.stories.push({storyName: storyNames, storyLoadSession: storyLoadSessions });
+
+        });
+
+
+        console.log("helloWorldSessions :",  helloWorldSessions);
+
+
+      //e.g.  helloWorldSessions[3].stories => Object {storyName: [ '"chicka_chicka_boom_boom"', '"geraldine_the_music_mouse"' ], storyLoadSession: [{ rawSheetIdx: 218, Datetime: "2020-12-28-12-10-13" }, { rawSheetIdx: 330, Datetime: "2020-12-28-12-38-04" }] }
+
+
+
+        let newCleanDataSheet = [];
+
+        rawDataKeys.forEach(objKey => {
+             console.log(objKey)
+        })
+
+        let dateTimeFlag = false;
+        let newSheetCounter = 0;
+        let storyName = "unknown";
+
+        let pauseStartAt = 0;
+        let readStartAt = 0;   
+
+        let totalTimePaused = 0;
+        let totalTimeReading = 0; 
+
+
+        helloWorldSessions.forEach((session, idx) => { // idx starts with 0
+
+            let currentStoryIdx = 0;
+            let pageNumber = 1;
+            let lineNumber = 1;  
+      
+
+            console.log("session.start :", session.start);
+            console.log("session.end :", session.end);
+
+
+            for(let i = session.start; i <= session.end; i++ ) {
+
+                // clone the new Sheet obj
+                let newSheetRow = JSON.parse(JSON.stringify(newSheetObj));
+
+
+
+                ///////////////////////////////////
+                //--------- Add Participant------//
+                ///////////////////////////////////
+
+                if( rawJsonData[i]["Event type"] === "HELLO_WORLD" ) {
+
+                       let rawParticipant = rawJsonData[i + 1]["Message"].split(":")[1];
+                       // test if  Participant string has single quote ('), if so remove 
+                       if( /[' "]/.test(rawParticipant) ) {
+                            rawParticipant = rawParticipant.replace(/[' "]/g, "");
+
+                       } else if ( /['"]/.test(rawParticipant) ) {
+                            rawParticipant = rawParticipant.replace(/['"]/g, "");
+                       }
+
+                       //-- newSheetRow["Participant"] = rawJsonData[i + 1]["Message"].split(":").pop();
+                       newSheetRow["Participant"] = rawParticipant;
+
+                } else {
+
+                       newSheetRow["Participant"] = newCleanDataSheet[i - 1]["Participant"]; 
+                }
+
+
+                ///////////////////////////////////
+                //---- Datetime & Date & time----//
+                //----------- Columns -----------//
+                ///////////////////////////////////
+
+                newSheetRow["Datetime"] = rawJsonData[i]["Datetime"];
+
+                // Split the string to extract date and time parts
+                let [year, month, day, hour24, minute, second] = rawJsonData[i]["Datetime"].split("-");
+
+                // Format the date
+                let date = `${year}-${month}-${day}`;
+
+                // Format the time
+                let hour = parseInt(hour24, 10);
+                let amPm = hour >= 12 ? 'PM' : 'AM';
+                // Convert 24-hour time to 12-hour time format
+                hour12 = hour % 12;
+                hour12 = hour12 ? hour12 : 12; // the hour '0' should be '12'
+
+                // // 12 hours format  
+                // -- let time = `${hour12}:${minute}:${second} ${amPm}`;
+
+                // 24 hours format
+                let time = `${hour}:${minute}:${second}`;
+
+                newSheetRow["Date"] = date;
+                newSheetRow["Time"] = time;
+
+                // newSheetRow["Seconds"] = "00:00:01";
+                
+                if (i < session.end) {
+                   newSheetRow["Seconds"] = formatTime( parseDatetime( rawJsonData[i+1]["Datetime"] ) - parseDatetime( rawJsonData[i]["Datetime"] ) );
+                }
+
+                
+
+                ///////////////////////////////////
+                //-------Add Selected Story------//
+                //-- Storybook Selected Column --//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "HELLO_WORLD") {
+                   
+                   newSheetRow["Storybook Selected"] = "TUTORIAL";
+
+                } else { // Other then HELLO_WORLD
+
+                   // STORY LOADED -- STORY NAME SHOULD APPEAR WITH "Storybook Selected."
+                   if (rawJsonData[i]["Event type"] === "STORY_LOADED") {
+
+                           newSheetRow["Storybook Selected"] = session.stories[0].storyName[currentStoryIdx];
+
+                           // Increment story index to get next story name in that session
+                           currentStoryIdx = currentStoryIdx +1;
+
+                   } else {
+
+                       // TUTORIAL MODE
+                       if( newCleanDataSheet[i - 1]["Storybook Selected"] === "TUTORIAL" ) {
+
+                               newSheetRow["Storybook Selected"] = "TUTORIAL";
+
+                       } else { // STORY MODE
+
+                               newSheetRow["Storybook Selected"] = newCleanDataSheet[i - 1]["Storybook Selected"]
+
+                       }
+                   }                    
+                }
+
+
+
+
+                ///////////////////////////////////////////////////////
+                //-----------Add Total page, Page & line number------//
+                //-----------Automatic  vs Selected Storytelling ----//
+                ///////////////////////////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "HELLO_WORLD") {
+                   
+                   newSheetRow["Total Page Number"] = 0; 
+                   newSheetRow["Page Number"] = 0; 
+                   newSheetRow["Line"] = 0; 
+                   newSheetRow["Automatic Storytelling vs Selected Storytelling "] = ""; 
+
+                } else { // Other then HELLO_WORLD
+
+                   // STORY LOADED -- 
+                   if (rawJsonData[i]["Event type"] === "STORY_LOADED") {
+
+                           //Reinit story page number and line number with every story loaded
+                           pageNumber = 1;
+                           lineNumber = 1;
+
+                           newSheetRow["Total Page Number"] = totalPageNumberObj[ newSheetRow["Storybook Selected"] ];  
+                           newSheetRow["Page Number"] = pageNumber; 
+                           newSheetRow["Line"] = lineNumber;  
+                           newSheetRow["Automatic Storytelling vs Selected Storytelling "] = "Automatic";                          
+
+                   } else {
+
+                       // TUTORIAL MODE
+                       if( newCleanDataSheet[i - 1]["Storybook Selected"] === "TUTORIAL" ) {
+
+                               newSheetRow["Total Page Number"] = 0;  
+                               newSheetRow["Page Number"] = 0;  
+                               newSheetRow["Line"] = 0;  
+                               newSheetRow["Automatic Storytelling vs Selected Storytelling "] = "";  
+
+                       } else { // STORY MODE
+
+                              let storyPageLineObj = getStoryBookObjByDateTime(rawJsonData[i]["Datetime"]);
+                              // -- storyPageLineObj : {Datetime: 2020-12-11-17-59-06, storyTitle:farm_animals , curPage: 2, curLine: 3}
+
+                              if(storyPageLineObj != null) {
+                                   lineNumber =  parseInt(storyPageLineObj["curLine"]);
+                                   //--pageNumber =  parseInt(storyPageLineObj["curPage"]);
+                              } else {
+                                 console.log(" No Datetime matching for story page line object")
+                              }
+
+                               newSheetRow["Total Page Number"] = totalPageNumberObj[ newSheetRow["Storybook Selected"] ];  
+                               newSheetRow["Page Number"] = pageNumber;  
+                               newSheetRow["Line"] = lineNumber;  //<<<<<< correct
+
+                               // After "STORY_LOADED" session begin, if tutorial command pressed, assign pause
+                               if( (rawJsonData[i]["Event type"] === "TUTORIAL_COMMAND") || 
+                                   (rawJsonData[i]["Event type"] === "END_STORY")    ) {
+
+                                    newSheetRow["Automatic Storytelling vs Selected Storytelling "] = "Paused";   //<<<<<< correct                       
+                               } else {
+
+                                    newSheetRow["Automatic Storytelling vs Selected Storytelling "] = "Automatic";   //<<<<<< correct                       
+
+                                     // newSheetRow["Automatic Storytelling vs Selected Storytelling "] = 
+                                     //    newCleanDataSheet[i - 1]["Automatic Storytelling vs Selected Storytelling "];                  
+                               }
+
+
+                       }
+
+                       // increment page num 
+                       if (rawJsonData[i]["Event type"] === "NEXT_PAGE") {
+                               pageNumber = pageNumber + 1;
+                       }
+
+                       // increment line number 
+                       // code to add
+
+                   } 
+
+                }
+
+
+
+                //////////////////////////////////
+                //---------Add Time Stopes------//
+                //////////////////////////////////
+                                      
+                // Check when Automatic  Storytelling  change to paused and stopped, and vice versa                    
+                //-- if(newSheetRow["Automatic Storytelling vs Selected Storytelling "] !== "") {
+                if(newCleanDataSheet.length > 1) {
+
+                   let prevState = newCleanDataSheet[i - 1]["Automatic Storytelling vs Selected Storytelling "];
+                   let currentState = newSheetRow["Automatic Storytelling vs Selected Storytelling "];
+
+                   if(prevState === "") {
+                          readStartAt = 0;
+                          pauseStartAt = 0;
+                          totalTimePaused = 0;
+                          totalTimeReading = 0;                          
+                   }                    
+                   
+                   if( ( currentState !== prevState )  ) {
+ 
+                         if(currentState === "Paused") {
+                             pauseStartAt  = newSheetRow["Datetime"];
+                         }
+
+                         if(currentState === "Automatic") {
+                            readStartAt  = newSheetRow["Datetime"];
+
+                         }   
+
+                         if(prevState !== "" &&  currentState !== "") {
+                            newSheetRow["Time Stopes"] = newSheetRow["Time"];
+                         }                      
+                   }
+
+                }
+
+
+
+                /////////////////////////////////////////////
+                //--------- Time Reading and Paused -------//
+                /////////////////////////////////////////////
+                                      
+                //-- if(newSheetRow["Automatic Storytelling vs Selected Storytelling "] !== "") {
+
+                if(newCleanDataSheet.length > 1) {
+
+                   let prevState =newCleanDataSheet[i - 1]["Automatic Storytelling vs Selected Storytelling "];
+                   let currentState = newSheetRow["Automatic Storytelling vs Selected Storytelling "];
+                   
+                   if( ( currentState !== prevState ) && (prevState !== "" ) ) {
+                        
+                         if(currentState === "Paused" && readStartAt != 0) {
+                             let timeReading = parseDatetime( newSheetRow["Datetime"] ) - parseDatetime( readStartAt );
+                             newSheetRow["Time Reading "] = formatTime( timeReading );
+                             totalTimeReading = totalTimeReading + timeReading;
+                         }
+
+                         if(currentState === "Automatic" && pauseStartAt != 0) {
+                            let timePaused = parseDatetime( newSheetRow["Datetime"] ) - parseDatetime( pauseStartAt );
+                            newSheetRow["Paused"] = formatTime( timePaused );
+                            totalTimePaused = totalTimePaused + timePaused;
+                         }  
+
+                         if(currentState === "" && prevState === "Automatic") {
+                             let timeReading = parseDatetime( newCleanDataSheet[i - 1]["Datetime"] ) - parseDatetime( readStartAt );
+                             newSheetRow["Time Reading "] = formatTime( timeReading );
+                             totalTimeReading = totalTimeReading + timeReading;
+                             newSheetRow["Total Time Reading"] = formatTime(totalTimeReading);
+                             newSheetRow["Total Time Paused"] = formatTime(totalTimePaused);
+                             newSheetRow["Total Time in Storybook"] = formatTime(totalTimePaused + totalTimeReading);
+
+                         }
+
+                         if(currentState === "" && prevState === "Paused") {
+                            let timePaused = parseDatetime( newCleanDataSheet[i - 1]["Datetime"] ) - parseDatetime( pauseStartAt );
+                            newSheetRow["Paused"] = formatTime(timePaused);
+                            totalTimePaused = totalTimePaused + timePaused;
+                            newSheetRow["Total Time Paused"] = formatTime(totalTimePaused);
+                            newSheetRow["Total Time Reading"] = formatTime(totalTimeReading);
+                            newSheetRow["Total Time in Storybook"] = formatTime(totalTimePaused + totalTimeReading);
+                         }                                                  
+
+                   } 
+
+                }
+
+
+
+
+                ///////////////////////////////////
+                //----- Add Tutorial Response ---//
+                //-- Tutorial Response Column  --//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "BUTTON_PRESSED") {
+                   
+                   newSheetRow["Tutorial Response"] = "BUTTON_PRESSED";
+
+                }
+
+
+                ///////////////////////////////////
+                //----- Add Tutorial Command ---//
+                //-- Tutorial Command Column  --//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "TUTORIAL_COMMAND") {
+                   
+                   newSheetRow["Tutorial Command"] = "TUTORIAL_COMMAND";
+
+                }
+
+
+
+
+                ///////////////////////////////////
+                //----- Add Next page Command ---//
+                //------- Next page Column  -----//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] != null && rawJsonData[i]["Event type"] === "NEXT_PAGE") {
+                   
+                   newSheetRow["NEXT_PAGE Tapped "] = "NEXT_PAGE";
+                }
+
+
+
+                /////////////////////////////////////
+                //-Index/ Line Word Tapped Column -//
+                /////////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] != null && (rawJsonData[i]["Event type"] === "WORD_TAPPED" || 
+                   rawJsonData[i]["Event type"] === "HIGHLIGHT_WORD" ) ) { 
+                   
+                   newSheetRow["Index/ Line Word Tapped "] = rawJsonData[i]["Message"];
+
+                }
+
+
+                /////////////////////////////////////
+                //------ Word Tapped  Column ------//
+                /////////////////////////////////////
+
+                if(rawJsonData[i]["_1"] != null && rawJsonData[i]["_1"].includes("word:") ) { 
+                   
+                   newSheetRow["Word Tapped "] = rawJsonData[i]["_1"];
+
+                }
+
+
+
+                /////////////////////////////////////
+                //--- Scene Object Tapped Column---//
+                /////////////////////////////////////
+
+                if(rawJsonData[i]["_1"] != null && rawJsonData[i]["_1"].includes("label:") ) { 
+                   
+                   newSheetRow["Scene Object Tapped"] = rawJsonData[i]["_1"];
+
+                }
+
+
+
+                ///////////////////////////////////
+                //--Jibo buttom pressed Column---//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "JIBO_QUESTION_ASKING_ACTIVITY") {
+                   
+                   newSheetRow["Jibo buttom pressed"] = "JIBO_QUESTION_ASKING_ACTIVITY";
+
+                }
+
+
+
+                ///////////////////////////////////
+                //--Jibo Asked Question Column---//
+                ///////////////////////////////////
+
+
+                let jiboTalkObj = getJiboStateObjByDateTime(rawJsonData[i]["Datetime"]);
+                // -- jiboTalkObj : { Datetime: "2020-12-11-18-05-13", jiboTalk: "What does it mean to reap the wheat? ", isQuestion: true }
+
+                if(jiboTalkObj != null) {
+
+                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"];
+                } else {
+                   console.log(" No Datetime matching for Jibo state talking object")
+                }
+
+                   
+   
+
+                ///////////////////////////////////
+                //----- Jibo Command Column -----//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "Receive Listen Command") {
+                   
+                   newSheetRow["Jibo Command"] = "Receive Listen Command";
+
+                }
+
+
+
+                //////////////////////////////////////////////////
+                //- Transcription or word/ image tapped  Column-//
+                //////////////////////////////////////////////////
+
+                // -- /[{}:]/.test(someString) will check if that string has any of the those characers {, }, :
+
+                if(rawJsonData[i]["Message"] !== "NOSPEECH" &&  rawJsonData[i]["Message"] != null &&
+                   rawJsonData[i]["Message"] !== "Explore mode" && ! /[{}:]/.test(rawJsonData[i]["Message"])) { 
+                   
+                   newSheetRow["Transcription or word/ image tapped "] = rawJsonData[i]["Message"];
+
+                }
+
+
+                ///////////////////////////////////
+                //--No Response to Jibo Column --//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Message"] === "NOSPEECH") {
+                   
+                   newSheetRow["No Response to Jibo"] = "NOSPEECH";
+
+                }
+
+
+
+
+                ///////////////////////////////////
+                //--- Confidence level  Column---//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "?????????????") {     /// <<<<<<<<<
+                   
+                   newSheetRow["Confidence level "] = "?????";
+
+                }                                
+
+
+
+
+                ///////////////////////////////////
+                //-Return to library Early Column-//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "RETURN_TO_LIBRARY_EARLY") {
+                   
+                   newSheetRow["Return to library Early"] = "RETURN_TO_LIBRARY_EARLY";
+
+                }
+
+
+
+                ///////////////////////////////////
+                //---Finished Storybook Column---//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "END_STORY") {
+                   
+                   newSheetRow["Finished Storybook"] = "END_STORY";
+
+                }
+
+
+                ///////////////////////////////////
+                //---Student Logout Column---//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "STUDENT_LOGOUT") {
+                   
+                   newSheetRow["Student Logout"] = "STUDENT_LOGOUT";
+
+                }
+
+
+
+                // Other commands to consider: 
+                // END_STORY    ->  can affect page number
+                // RETURN_TO_LIBRARY_EARLY ->  can affect page number
+                // STUDENT_LOGOUT    ->   can affect page number 
+
+
+
+                ///////////////////////////////////
+                //----- Add to clean sheet-------//
+                ///////////////////////////////////
+
+
+                newCleanDataSheet.push(newSheetRow);  
+
+
+
+            }
+            
+
+         });
+
+
+         //// Remove first duplicates from newCleanDataSheet 
+         // newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
+ 
+
+
+         // Merging similar Datetime rows
+         for( let idx = 1; idx < newCleanDataSheet.length; idx ++) {
+
+            if(newCleanDataSheet[idx]["Datetime"] === newCleanDataSheet[idx - 1]["Datetime"]) {
+
+                 cleanDataKeys.forEach(key => {
+                      //--key one of Array(31) [ "Participant", "Datetime", "Date", "Time", ..]
+                      if(newCleanDataSheet[idx][key] !== newCleanDataSheet[idx - 1][key] ) {
+                               if(newCleanDataSheet[idx][key] == null || newCleanDataSheet[idx][key] === "") {
+                                  // since current row cell is empty, and previous row cell is not, copy the value of previous cell into current row cell
+                                  newCleanDataSheet[idx][key] = newCleanDataSheet[idx - 1][key];
+                               }
+
+                      }
+
+                 })
+                 
+            }
+         }
+ 
+
+          // Remove deplicate Datetime rows
+         for( let idx = 0; idx < newCleanDataSheet.length -1; ) {
+
+            if(newCleanDataSheet[idx + 1]["Datetime"] === newCleanDataSheet[idx]["Datetime"]) {
+              
+               newCleanDataSheet.splice(idx, 1);
+            } else {
+
+               idx =  idx +1;
+            }
+         }
+
+         //// Remove first duplicates from newCleanDataSheet 
+         //-- newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
+
+
+        return  newCleanDataSheet;
+
+   }
+
+
+
+
+
+    ///////////////////////////////////////
+    //////////--------WEBIX------//////////
+    ///////////////////////////////////////
+
+  	webix.ready(function () {
+
+		  //  Main Parameters
+		  let jiboStateFolderPath = "jibo_state/";
+		  let storybookStateFolderPath = "storybook_state/";
+
+      // Enable/disable ranking column for tables rows
+      let enableRankFlag = false;
+      
+      // For lage csv like storybookState and jiboState
+      let  enableDataSampling = false;
+      let numOfSamples = 10;
+
+		  let swTimeOut = 1000;			
+		  let rawCsvFileName = '';
+		  let StorybookStateFileName = '';
+		  let jiboStateFileName = '';
+
+      let rawJsonData = [];
+      //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD", 
+      //                     Message: null, "": null, _1: null, _2: null, _3: null, _4: null }      
+      let rawStoryBookState = [];
+      //-- rawStoryBookState[0] :{ Datetime: "2020-12-11-17-35-29",  audio_playing:  False, audio_file:  "chicka_chicka_boom_boom-01-01.wav",  storybook_mode: "EXPLORE_MODE", page number:  16 }      
+      let rawJiboState = [];
+      //-- rawJiboState[0] :{ Datetime: "2020-12-11-17-41-39",  in_motion: "" , audio:  "",  tts_msg: "Look at all those storybooks!", volume:   "and selecting the book you want to read", led_color: "NO DATA", lookat: NO DATA , doing_motion: True , is_playing_sound: True ,  is_listening: False }
+
+      let newCleanCSVSheet = [];
+
+      checkAllUpload = () => {
+          return rawJsonData.length && rawStoryBookState.length && rawJiboState.length ? true : false;
+      }
+      
+
+		  let about = "Demo of Jibo mapping";
+		  aboutClick = () => {
+		      webix.alert({
+		        title:"",
+		        ok:"Ok",
+		        text: about
+		      })
+		  }
+
+
+
+		  toolbar = {
+		    view: "toolbar",
+  	    id: "myToolbar",
+		    rows:[{ cols: [
+		   	  { view: "label", label: "JIBO&nbsp;MAPPING", css: {"margin":"0!important"},  inputWidth: 100, align: "left" }, 
+		      { view: "button", id: "About", value: "About", width: 100, align: "right", click: aboutClick }
+		    ]}
+		   ]
+		  }
+
+
+		  let rawCsvFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
+										  	 { type:"header", template:"Load Raw CSV"},
+										     {cols: [ 
+                           {  view: "label", label: "Select File",  
+                              align: "left"
+                           }, 
+												  { 
+												   view: "uploader" , value: "Browse", width: 100, id:"rawCsvUploader",
+												   align: "left",
+												   accept: "text/csv",
+												   autosend: false, 
+												   multiple: false, 
+												   on: {        
+											          onBeforeFileAdd: function(upload) {        
+												          let file = upload.file;
+												          rawCsvFileName = file;
+												          // File { name: "combined104.csv", lastModified: 1704578818136, webkitRelativePath: "", size: 31419, type: "text/csv" }
+												         // rawCsvFileName['name']= "combined104.csv"
+
+												          let reader = new FileReader();  
+										              reader.onloadend = function(event) {
+
+						                          if (event.target.readyState === FileReader.DONE) {
+
+                                         // Convert CSV data to JSON
+                                         rawJsonData = convertCsv2Json(event.target.result); 
+                                         //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD",    Message: null, "": null, _1: null, _2: null, _3: null, _4: null }  
+
+                                         webix.message({
+                                            text: file['name'] + " loaded.",
+                                            expire: 5000, // time in milliseconds after which the message will disappear
+                                            type: "info",
+                                            css: "my-popup"
+                                         });              
+
+                                         // Open  RAW CSV tab 
+                                         // $$("tabview").setValue("rawCsvTab");
+
+                                         $$("rawCsvUploader").disable();                                         
+
+						                             // Draw table with Raw tab for visualization 
+						                             convert2Table(rawJsonData, "rawCsvTableId", enableRankFlag,true);
+						                          
+
+
+                                         // Check if all needed CSV fils uploaded 
+                                         if(checkAllUpload()) {
+                                               $$("convertBtn").enable();
+                                         }
+						                          }
+										              };
+
+										              reader.readAsText(file);
+										              return false;
+											         }
+												      }
+												  },
+
+											  ]} 
+
+      ]}
+ 
+
+ 		  let storybookStateFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
+										  	 { type:"header", template:"Load Storybook State"},
+										     {cols: [ 
+                           {  view: "label", label: "Select File",  
+                              align: "left"
+                           }, 
+												  { 
+												   view: "uploader" , value: "Browse", width: 100, id:"storyStateCsvUploader",
+												   align: "left",
+												   accept: "text/csv",
+												   autosend: false, 
+												   multiple: false, 
+												   on: {        
+											          onBeforeFileAdd: function(upload) {        
+												          let file = upload.file;
+												          StorybookStateFileName = file;
+												          //file { name: "c201_0_storybook_Combined.csv", lastModified: 1548792883000, webkitRelativePath: "", size: 503010, type: "text/csv" }
+												         // StorybookStateFileName['name']= "c201_0_storybook_Combined.csv"
+
+												          let reader = new FileReader();  
+										              reader.onloadend = function(event) {
+
+						                          if (event.target.readyState === FileReader.DONE) {
+
+                                         // Convert CSV data to JSON
+                                         rawStoryBookState = convertCsv2Json(event.target.result); 
+                                         //-- rawStoryBookState[0] :{ Datetime: "2020-12-11-17-35-29",  audio_playing:  False, audio_file:  "chicka_chicka_boom_boom-01-01.wav",  storybook_mode: "EXPLORE_MODE", page number:  16 }                                         
+
+                                         webix.message({
+                                            text: file['name'] + " loaded.",
+                                            expire: 5000, // time in milliseconds after which the message will disappear
+                                            type: "info",
+                                            css: "my-popup"
+                                         });
+
+                                         // Open  STORY STATE SAMPLE tab 
+                                         // $$("tabview").setValue("storyStateSampleTab");
+
+    
+                                         $$("storyStateCsvUploader").disable();
+
+                                         // Tabulate CSV data with Raw tab for visualization 
+                                         if(enableDataSampling) {
+                                             convert2Table(rawStoryBookState.slice(0, numOfSamples), "storyStateTableId", enableRankFlag, true);
+                                         } else {
+                                             // Tabulate  all CSV data 
+                                             convert2Table(rawStoryBookState, "storyStateTableId", enableRankFlag, "header");
+                                         }
+
+
+
+                                         // Check if all needed CSV fils uploaded
+                                         if(checkAllUpload()) {
+                                               $$("convertBtn").enable();
+                                         }
+
+						                          }
+										              };
+
+										              reader.readAsText(file);
+										              return false;
+											         }
+												      }
+												  },
+
+											  ]} 
+
+      ]}
+
+		  let jiboStateFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
+										  	 { type:"header", template:"Load Jibo State"},
+										     {cols: [ 
+                           {  view: "label", label: "Select File",  
+                              align: "left"
+                           }, 
+												  { 
+												   view: "uploader" , value: "Browse", width: 100, id:"jiboStateCsvUploader",
+												   align: "left",
+												   accept: "text/csv",
+												   autosend: false, 
+												   multiple: false, 
+												   on: {        
+											          onBeforeFileAdd: function(upload) {        
+												          let file = upload.file;
+												          jiboStateFileName = file;
+												          //file { name: "c201_0_jibostate_Combined.csv", lastModified: 1548792883000, webkitRelativePath: "", size: 503010, type: "text/csv" }
+												         // rawCsvFileName['name']= "c201_0_jibostate_Combined.csv"
+
+												          let reader = new FileReader();  
+										              reader.onloadend = function(event) {
+
+						                          if (event.target.readyState === FileReader.DONE) {
+
+                                         // Convert CSV data to JSON
+                                         rawJiboState = convertCsv2Json(event.target.result); 
+                                         //-- rawJiboState[0] :{ Datetime: "2020-12-11-17-41-39",  in_motion: "" , audio:  "",  tts_msg: "Look at all those storybooks!", volume:   "and selecting the book you want to read", led_color: "NO DATA", lookat: NO DATA , doing_motion: True , is_playing_sound: True ,  is_listening: False }
+
+                                         webix.message({
+                                            text: file['name'] + " loaded.",
+                                            expire: 5000, // time in milliseconds after which the message will disappear
+                                            type: "info",
+                                            css: "my-popup"
+                                         });    
+
+                                         // open JIBO STATE SAMPLE tab 
+                                         // $$("tabview").setValue("jiboStateSampleTab");                                     
+
+                                         $$("jiboStateCsvUploader").disable();
+
+                                         // Tabulate JSON data with Raw tab for visualization 
+                                         if(enableDataSampling) {
+						                                 convert2Table(rawJiboState.slice(0, numOfSamples), "jiboStateTableId", enableRankFlag, true);
+                                         } else {
+                                             // Tabulate  all CSV data 
+                                             convert2Table(rawJiboState, "jiboStateTableId", enableRankFlag, "header");
+                                         }
+						                          
+						                             
+
+                                         // Check if all needed CSV fils uploaded
+                                         if(checkAllUpload()) {
+                                               $$("convertBtn").enable();
+                                         }
+
+						                          }
+										              };
+
+										              reader.readAsText(file);
+										              return false;
+											         }
+												      }
+												  },
+
+											  ]} 
+
+      ]}      
+
+		  let convertCsv = {view: "form", css: {"border-radius": "20px"},  elements: [ 
+										  	 { type:"header", template:"Convert CSV"},
+										     {rows: [ 
+										      
+											      { view: "switch", label: "Convert",  
+											        offLabel: "Off", 
+											        onLabel: "On", 
+											        value: 0, 
+											        labelWidth:130, 
+											        id: "convertBtn", 
+											        align: "left",
+
+											        on:{        
+											         onChange: function(newValue, oldValue, config) {   
+                                    if(newValue) {
+                                         newCleanCSVSheet = jiboMapping(rawJsonData, rawStoryBookState, rawJiboState);
+
+                                         convert2Table(newCleanCSVSheet, "newCsvTableId", enableRankFlag, true);
+
+                                         if(newCleanCSVSheet.length) {
+                                              $$("downloadBtn").enable();
+                                         }
+
+                                    }
+
+											        }
+											      }
+											    }
+
+		                  ]}
+		       ]}
+
+
+       downloadNewCsv = (outCsvFileName) => {
+             df = new dfd.DataFrame(newCleanCSVSheet);
+             dfd.toCSV(df, { download: true, fileName:  outCsvFileName  });
+       }
+
+
+      let downloadCsvFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
+              { type:"header", template:"Save CSV Output"  },
+
+              {  cols: [
+                    {   view: "label", label: "File Name",  
+                        align: "left"
+                    },                 
+                    { view: "text", 
+                      value: "out.csv",  
+                      id: "fileNameToDL", 
+                      disabled: false,
+                      align: "left",
+                      on: {
+                        onChange: function(newValue, oldValue, config) {
+                          if(newValue.length && isLetter(newValue[0])) {
+                               $$("downloadBtn").enable();
+                          } else {
+                               $$("downloadBtn").disable();
+                          }
+
+                        }
+                      }
+                    }
+                ]    
+             },             
+
+              {  cols: [
+                    {   view: "label", label: "CSV File",  
+                        align: "left"
+                    },                 
+                    { view: "button", label: "Save",  
+                      id: "downloadBtn", 
+                      css: "bt_1",
+                      disabled: true,
+                      align: "left",
+                      click: function() {  
+
+                            // if(allOutputSlices3DCC1DimArray.length) {
+                            if(true) {	
+                                 let downloadFileName = $$("fileNameToDL").getValue();
+                                 
+                                 if(downloadFileName.search(".csv") < 0) { 
+                                      // if csv extension doesn't exist, then search will return -1
+                                      downloadFileName = downloadFileName + ".csv";
+                                 }
+
+                                 downloadNewCsv(downloadFileName);
+
+                            } else {
+                                webix.message("No download Data");
+                            }   
+                      }  
+                    }
+                ]    
+             }
+          ]
+       }
+
+
+
+      // Define the tabview configuration with empty datatables
+      let tabViewer = {
+        view: "tabview",
+        id: "tabviewId",
+        gravity: 8, // Use gravity to control the height distribution (70% of the height)
+        cells: [
+          {
+            header: "RAW CSV",
+            id: "rawCsvTab",
+            body: {
+              view: "datatable",
+              id: "rawCsvTableId",
+              autoheight: false,
+              autowidth: false,
+              scroll: "xy",
+              resizeColumn: true, // Enable column resizing
+              css: "webix_shadow_medium", // Add CSS class for border        
+              data: []
+            }
+          },
+          {
+            header: "STORY STATE SAMPLE",
+            id: "storyStateSampleTab",
+            body: {
+              view: "datatable",
+              id: "storyStateTableId",
+              autoheight: false,
+              autowidth: false,
+              scroll: "xy",
+              resizeColumn: true, // Enable column resizing
+              css: "webix_shadow_medium", // Add CSS class for border        
+              data: []
+            }
+          },
+          {
+            header: "JIBO STATE SAMPLE",
+            id: "jiboStateSampleTab",
+            body: {
+              view: "datatable",
+              id: "jiboStateTableId",
+              autoheight: false,
+              autowidth: false,
+              scroll: "xy",
+              resizeColumn: true, // Enable column resizing
+              css: "webix_shadow_medium", // Add CSS class for border        
+              data: []
+            }
+          },
+          {
+            header: "NEW MAPPED CSV",
+            id: "newMappedCsvTab",
+            body: {
+              view: "datatable",
+              id: "newCsvTableId",
+              autoheight: false,
+              autowidth: false,
+              scroll: "xy",
+              resizeColumn: true, // Enable column resizing
+              css: "webix_shadow_medium", // Add CSS class for border        
+              data: []
+            }
+          }
+        ]
+   
+      };
+
+	    ///////////////////////////////////////////////
+
+		   webix.ui({
+		      margin:5,
+		      rows:[toolbar,
+		      {
+		      margin:20,
+		      padding: 20,
+		      cols: [{width: 250, rows:[
+		      rawCsvFile, storybookStateFile, jiboStateFile, convertCsv  , downloadCsvFile, {}]},
+		      { rows: [  tabViewer, { gravity: 2,content: ""}]}]
+		    }]
+		    });
+		     
+		    
+
+
+		    $$("convertBtn").attachEvent("onItemClick", function() {
+		     
+		          if( $$("convertBtn").getValue() ) {
+
+                 rawCsvFileName = '';
+                 StorybookStateFileName = '';
+                 jiboStateFileName = '';
+                 rawJsonData = [];
+                 rawStoryBookState = [];
+                 rawJiboState = [];
+
+                 $$("rawCsvUploader").enable();
+                 $$("storyStateCsvUploader").enable();
+                 $$("jiboStateCsvUploader").enable();
+                 setInterval(function(){  }, 4000); 
+                 setTimeout(function(){ $$("convertBtn").disable(); $$("convertBtn").setValue(0)}, swTimeOut);                  
+		   
+		          }
+		 
+		    });
+
+		    $$("convertBtn").disable();
+		       
+
+	 })  
+
+	</script>
+
+</body>
+</html>
