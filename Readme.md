@@ -1,7 +1,6 @@
   
 # Jibo Mapping Task. 
 
-## Online Demo
   
 ## Local Setup
 
