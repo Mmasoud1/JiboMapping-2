@@ -263,7 +263,8 @@
 
   convertCsv2Json = (csvContent) => {
        // header true to convert it as json object not as an array
-       return Papa.parse(csvContent, { skipEmptyLines: true, header: true, delimiter: ';', dynamicTyping: true}).data;
+       // delimiter: "" for Auto-detect delimiter ";" or ","
+       return Papa.parse(csvContent, { skipEmptyLines: true, header: true, delimiter: "", dynamicTyping: true}).data;
 
   }
 
