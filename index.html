@@ -31,8 +31,8 @@
   <script src="https://cdn.jsdelivr.net/npm/danfojs@1.1.2/lib/bundle.js"></script>
   <script src="js/libs/Dropbox-sdk.min.js"></script>
   <script src="js/libs/jquery-3.5.1.js"></script>
-  <!-- <script src="js/libs/papaparse.min.js"></script>   -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+  <script src="js/libs/papaparse.min.js"></script>  
+
 
 <style>
   /*table, th, td {
@@ -255,7 +255,7 @@
    * @since 1.0.0
    * @version 1.0.0
    * @param {string} csvContent
-   * @param {string} delimiter  e.g. ";" or ","  for example Datetime;Event type;Message     or  Datetime,Event type,Message,,,,,
+   * @param {string} delimiter  e.g. ";" or ","  for example 
    * @returns {Array} Array of objects
    * @example 
    *
@@ -1238,11 +1238,11 @@
     //////////--------WEBIX------//////////
     ///////////////////////////////////////
 
-  	webix.ready(function () {
+    webix.ready(function () {
 
-		  //  Main Parameters
-		  let jiboStateFolderPath = "jibo_state/";
-		  let storybookStateFolderPath = "storybook_state/";
+      //  Main Parameters
+      let jiboStateFolderPath = "jibo_state/";
+      let storybookStateFolderPath = "storybook_state/";
 
       // Enable/disable ranking column for tables rows
       let enableRankFlag = false;
@@ -1251,10 +1251,10 @@
       let  enableDataSampling = false;
       let numOfSamples = 10;
 
-		  let swTimeOut = 1000;			
-		  let rawCsvFileName = '';
-		  let StorybookStateFileName = '';
-		  let jiboStateFileName = '';
+      let swTimeOut = 1000;     
+      let rawCsvFileName = '';
+      let StorybookStateFileName = '';
+      let jiboStateFileName = '';
 
       let rawJsonData = [];
       //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD", 
@@ -1271,51 +1271,51 @@
       }
       
 
-		  let about = "Demo of Jibo mapping";
-		  aboutClick = () => {
-		      webix.alert({
-		        title:"",
-		        ok:"Ok",
-		        text: about
-		      })
-		  }
+      let about = "Demo of Jibo mapping";
+      aboutClick = () => {
+          webix.alert({
+            title:"",
+            ok:"Ok",
+            text: about
+          })
+      }
 
 
 
-		  toolbar = {
-		    view: "toolbar",
-  	    id: "myToolbar",
-		    rows:[{ cols: [
-		   	  { view: "label", label: "JIBO&nbsp;MAPPING", css: {"margin":"0!important"},  inputWidth: 100, align: "left" }, 
-		      { view: "button", id: "About", value: "About", width: 100, align: "right", click: aboutClick }
-		    ]}
-		   ]
-		  }
+      toolbar = {
+        view: "toolbar",
+        id: "myToolbar",
+        rows:[{ cols: [
+          { view: "label", label: "JIBO&nbsp;MAPPING", css: {"margin":"0!important"},  inputWidth: 100, align: "left" }, 
+          { view: "button", id: "About", value: "About", width: 100, align: "right", click: aboutClick }
+        ]}
+       ]
+      }
 
 
-		  let rawCsvFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
-										  	 { type:"header", template:"Load Raw CSV"},
-										     {cols: [ 
+      let rawCsvFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
+                         { type:"header", template:"Load Raw CSV"},
+                         {cols: [ 
                            {  view: "label", label: "Select File",  
                               align: "left"
                            }, 
-												  { 
-												   view: "uploader" , value: "Browse", width: 100, id:"rawCsvUploader",
-												   align: "left",
-												   accept: "text/csv",
-												   autosend: false, 
-												   multiple: false, 
-												   on: {        
-											          onBeforeFileAdd: function(upload) {        
-												          let file = upload.file;
-												          rawCsvFileName = file;
-												          // File { name: "combined104.csv", lastModified: 1704578818136, webkitRelativePath: "", size: 31419, type: "text/csv" }
-												         // rawCsvFileName['name']= "combined104.csv"
+                          { 
+                           view: "uploader" , value: "Browse", width: 100, id:"rawCsvUploader",
+                           align: "left",
+                           accept: "text/csv",
+                           autosend: false, 
+                           multiple: false, 
+                           on: {        
+                                onBeforeFileAdd: function(upload) {        
+                                  let file = upload.file;
+                                  rawCsvFileName = file;
+                                  // File { name: "combined104.csv", lastModified: 1704578818136, webkitRelativePath: "", size: 31419, type: "text/csv" }
+                                 // rawCsvFileName['name']= "combined104.csv"
 
-												          let reader = new FileReader();  
-										              reader.onloadend = function(event) {
+                                  let reader = new FileReader();  
+                                  reader.onloadend = function(event) {
 
-						                          if (event.target.readyState === FileReader.DONE) {
+                                      if (event.target.readyState === FileReader.DONE) {
 
                                          const delimiter = detectDelimiter(event.target.result);
 
@@ -1338,52 +1338,52 @@
 
                                          $$("rawCsvUploader").disable();                                         
 
-						                             // Draw table with Raw tab for visualization 
-						                             convert2Table(rawJsonData, "rawCsvTableId", enableRankFlag,true);
-						                          
+                                         // Draw table with Raw tab for visualization 
+                                         convert2Table(rawJsonData, "rawCsvTableId", enableRankFlag,true);
+                                      
 
 
                                          // Check if all needed CSV fils uploaded 
                                          if(checkAllUpload()) {
                                                $$("convertBtn").enable();
                                          }
-						                          }
-										              };
+                                      }
+                                  };
 
-										              reader.readAsText(file);
-										              return false;
-											         }
-												      }
-												  },
+                                  reader.readAsText(file);
+                                  return false;
+                               }
+                              }
+                          },
 
-											  ]} 
+                        ]} 
 
       ]}
  
 
- 		  let storybookStateFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
-										  	 { type:"header", template:"Load Storybook State"},
-										     {cols: [ 
+      let storybookStateFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
+                         { type:"header", template:"Load Storybook State"},
+                         {cols: [ 
                            {  view: "label", label: "Select File",  
                               align: "left"
                            }, 
-												  { 
-												   view: "uploader" , value: "Browse", width: 100, id:"storyStateCsvUploader",
-												   align: "left",
-												   accept: "text/csv",
-												   autosend: false, 
-												   multiple: false, 
-												   on: {        
-											          onBeforeFileAdd: function(upload) {        
-												          let file = upload.file;
-												          StorybookStateFileName = file;
-												          //file { name: "c201_0_storybook_Combined.csv", lastModified: 1548792883000, webkitRelativePath: "", size: 503010, type: "text/csv" }
-												         // StorybookStateFileName['name']= "c201_0_storybook_Combined.csv"
+                          { 
+                           view: "uploader" , value: "Browse", width: 100, id:"storyStateCsvUploader",
+                           align: "left",
+                           accept: "text/csv",
+                           autosend: false, 
+                           multiple: false, 
+                           on: {        
+                                onBeforeFileAdd: function(upload) {        
+                                  let file = upload.file;
+                                  StorybookStateFileName = file;
+                                  //file { name: "c201_0_storybook_Combined.csv", lastModified: 1548792883000, webkitRelativePath: "", size: 503010, type: "text/csv" }
+                                 // StorybookStateFileName['name']= "c201_0_storybook_Combined.csv"
 
-												          let reader = new FileReader();  
-										              reader.onloadend = function(event) {
+                                  let reader = new FileReader();  
+                                  reader.onloadend = function(event) {
 
-						                          if (event.target.readyState === FileReader.DONE) {
+                                      if (event.target.readyState === FileReader.DONE) {
 
                                          const delimiter = detectDelimiter(event.target.result);
 
@@ -1419,42 +1419,42 @@
                                                $$("convertBtn").enable();
                                          }
 
-						                          }
-										              };
+                                      }
+                                  };
 
-										              reader.readAsText(file);
-										              return false;
-											         }
-												      }
-												  },
+                                  reader.readAsText(file);
+                                  return false;
+                               }
+                              }
+                          },
 
-											  ]} 
+                        ]} 
 
       ]}
 
-		  let jiboStateFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
-										  	 { type:"header", template:"Load Jibo State"},
-										     {cols: [ 
+      let jiboStateFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
+                         { type:"header", template:"Load Jibo State"},
+                         {cols: [ 
                            {  view: "label", label: "Select File",  
                               align: "left"
                            }, 
-												  { 
-												   view: "uploader" , value: "Browse", width: 100, id:"jiboStateCsvUploader",
-												   align: "left",
-												   accept: "text/csv",
-												   autosend: false, 
-												   multiple: false, 
-												   on: {        
-											          onBeforeFileAdd: function(upload) {        
-												          let file = upload.file;
-												          jiboStateFileName = file;
-												          //file { name: "c201_0_jibostate_Combined.csv", lastModified: 1548792883000, webkitRelativePath: "", size: 503010, type: "text/csv" }
-												         // rawCsvFileName['name']= "c201_0_jibostate_Combined.csv"
+                          { 
+                           view: "uploader" , value: "Browse", width: 100, id:"jiboStateCsvUploader",
+                           align: "left",
+                           accept: "text/csv",
+                           autosend: false, 
+                           multiple: false, 
+                           on: {        
+                                onBeforeFileAdd: function(upload) {        
+                                  let file = upload.file;
+                                  jiboStateFileName = file;
+                                  //file { name: "c201_0_jibostate_Combined.csv", lastModified: 1548792883000, webkitRelativePath: "", size: 503010, type: "text/csv" }
+                                 // rawCsvFileName['name']= "c201_0_jibostate_Combined.csv"
 
-												          let reader = new FileReader();  
-										              reader.onloadend = function(event) {
+                                  let reader = new FileReader();  
+                                  reader.onloadend = function(event) {
 
-						                          if (event.target.readyState === FileReader.DONE) {
+                                      if (event.target.readyState === FileReader.DONE) {
 
                                          const delimiter = detectDelimiter(event.target.result);
 
@@ -1476,46 +1476,46 @@
 
                                          // Tabulate JSON data with Raw tab for visualization 
                                          if(enableDataSampling) {
-						                                 convert2Table(rawJiboState.slice(0, numOfSamples), "jiboStateTableId", enableRankFlag, true);
+                                             convert2Table(rawJiboState.slice(0, numOfSamples), "jiboStateTableId", enableRankFlag, true);
                                          } else {
                                              // Tabulate  all CSV data 
                                              convert2Table(rawJiboState, "jiboStateTableId", enableRankFlag, "header");
                                          }
-						                          
-						                             
+                                      
+                                         
 
                                          // Check if all needed CSV fils uploaded
                                          if(checkAllUpload()) {
                                                $$("convertBtn").enable();
                                          }
 
-						                          }
-										              };
+                                      }
+                                  };
 
-										              reader.readAsText(file);
-										              return false;
-											         }
-												      }
-												  },
+                                  reader.readAsText(file);
+                                  return false;
+                               }
+                              }
+                          },
 
-											  ]} 
+                        ]} 
 
       ]}      
 
-		  let convertCsv = {view: "form", css: {"border-radius": "20px"},  elements: [ 
-										  	 { type:"header", template:"Convert CSV"},
-										     {rows: [ 
-										      
-											      { view: "switch", label: "Convert",  
-											        offLabel: "Off", 
-											        onLabel: "On", 
-											        value: 0, 
-											        labelWidth:130, 
-											        id: "convertBtn", 
-											        align: "left",
+      let convertCsv = {view: "form", css: {"border-radius": "20px"},  elements: [ 
+                         { type:"header", template:"Convert CSV"},
+                         {rows: [ 
+                          
+                            { view: "switch", label: "Convert",  
+                              offLabel: "Off", 
+                              onLabel: "On", 
+                              value: 0, 
+                              labelWidth:130, 
+                              id: "convertBtn", 
+                              align: "left",
 
-											        on:{        
-											         onChange: function(newValue, oldValue, config) {   
+                              on:{        
+                               onChange: function(newValue, oldValue, config) {   
                                     if(newValue) {
                                          newCleanCSVSheet = jiboMapping(rawJsonData, rawStoryBookState, rawJiboState);
 
@@ -1527,12 +1527,12 @@
 
                                     }
 
-											        }
-											      }
-											    }
+                              }
+                            }
+                          }
 
-		                  ]}
-		       ]}
+                      ]}
+           ]}
 
 
        downloadNewCsv = (outCsvFileName) => {
@@ -1579,7 +1579,7 @@
                       click: function() {  
 
                             // if(allOutputSlices3DCC1DimArray.length) {
-                            if(true) {	
+                            if(true) {  
                                  let downloadFileName = $$("fileNameToDL").getValue();
                                  
                                  if(downloadFileName.search(".csv") < 0) { 
@@ -1667,26 +1667,26 @@
    
       };
 
-	    ///////////////////////////////////////////////
+      ///////////////////////////////////////////////
 
-		   webix.ui({
-		      margin:5,
-		      rows:[toolbar,
-		      {
-		      margin:20,
-		      padding: 20,
-		      cols: [{width: 250, rows:[
-		      rawCsvFile, storybookStateFile, jiboStateFile, convertCsv  , downloadCsvFile, {}]},
-		      { rows: [  tabViewer, { gravity: 2,content: ""}]}]
-		    }]
-		    });
-		     
-		    
+       webix.ui({
+          margin:5,
+          rows:[toolbar,
+          {
+          margin:20,
+          padding: 20,
+          cols: [{width: 250, rows:[
+          rawCsvFile, storybookStateFile, jiboStateFile, convertCsv  , downloadCsvFile, {}]},
+          { rows: [  tabViewer, { gravity: 2,content: ""}]}]
+        }]
+        });
+         
+        
 
 
-		    $$("convertBtn").attachEvent("onItemClick", function() {
-		     
-		          if( $$("convertBtn").getValue() ) {
+        $$("convertBtn").attachEvent("onItemClick", function() {
+         
+              if( $$("convertBtn").getValue() ) {
 
                  rawCsvFileName = '';
                  StorybookStateFileName = '';
@@ -1700,17 +1700,17 @@
                  $$("jiboStateCsvUploader").enable();
                  setInterval(function(){  }, 4000); 
                  setTimeout(function(){ $$("convertBtn").disable(); $$("convertBtn").setValue(0)}, swTimeOut);                  
-		   
-		          }
-		 
-		    });
+       
+              }
+     
+        });
 
-		    $$("convertBtn").disable();
-		       
+        $$("convertBtn").disable();
+           
 
-	 })  
+   })  
 
-	</script>
+  </script>
 
 </body>
 </html>
