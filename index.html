@@ -135,6 +135,49 @@
 
 
 
+    combineAndSortFiles = (fileContents) => {
+
+        const headerLine = 'Datetime;Event type;Message';
+        const firstFileHeader = fileContents[0].split('\n')[0].trim();
+
+
+        if (firstFileHeader !== headerLine) {
+            const secondFileHeader = fileContents[1].split('\n')[0].trim();
+
+            if (secondFileHeader !== headerLine) {
+                
+                alert('No file is the storybook_event.csv with the correct header');
+                return;
+
+            } else {
+              // seond file uploaded is the storybook_event.csv
+              // This also means  storybook_command.csv file contents uploaded first
+              // Swap commands file contents with event contents to make event contents comes first
+
+              let temp = fileContents[0];
+              fileContents[0] = fileContents[1];
+              fileContents[1] = temp;
+            }
+        }
+
+
+        const eventData = Papa.parse(fileContents[0], { header: true, delimiter: ';', skipEmptyLines: true }).data;
+        const commandData = Papa.parse(fileContents[1], { header: false, delimiter: ';', skipEmptyLines: true }).data;
+
+        const processedCommandData = commandData.map(row => ({
+            "Datetime": row[0],
+            "Event type": row[1],
+            "Message": row[2]
+        }));
+
+        const combinedData = [...eventData, ...processedCommandData];
+        combinedData.sort((a, b) => ( parseDatetime(a.Datetime) >= parseDatetime(b.Datetime) ? 1 : -1 ) );
+
+        return combinedData;
+
+    }
+
+
   /**
    *  Function to convert time in milliseconds to  HH:MM:SS format
    *
@@ -243,6 +286,55 @@
         return semicolonCount > commaCount ? ';' : ',';
     }
  
+
+
+// Split 'Message' contents such that:
+//{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD",    Message: {"needs_download":true,"story_name": [],"last_read_page": [],"tutorial_needed": false,"game_mode": "explore"}}  
+//To
+//{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD",    Message: '{"needs_download":true', "": null, _1: ' "story_name": []', _2: ' "last_read_page": []', _3: ' "tutorial_needed": false', _4: ' "game_mode": "explore"}' }    
+
+  function transformJsonObject(row) {
+      const transformedMessage = {};
+
+      transformedMessage["Datetime"] = row["Datetime"];
+      transformedMessage["Event type"] = row["Event type"];
+
+      if( row.Message !== null) {
+          let message;
+          try {
+              message = JSON.parse(row.Message);
+          } catch (e) {
+              console.error('Error parsing Message:', e);
+              return row;
+          }
+
+
+          const keys = Object.keys(message);
+
+          transformedMessage["Message"] = JSON.stringify({[keys[0]]: message[keys[0]]}).slice(1, -1);
+          transformedMessage[""] = null;
+          for (let i = 1; i < keys.length; i++) {
+              transformedMessage[`_${i}`] = JSON.stringify({[keys[i]]: message[keys[i]]}).slice(1, -1);
+          }
+          
+      } else {
+          transformedMessage["Message"] = null;
+          transformedMessage[""] = null;
+          transformedMessage["_1"] = null;
+          transformedMessage["_2"] = null;
+          transformedMessage["_3"] = null;
+          transformedMessage["_4"] = null;
+      
+      }   
+     
+      return transformedMessage;
+  }
+
+
+    // Function to transform an array of JSON objects
+    function transformJsonArray(arrayOfObj) {
+        return arrayOfObj.map(transformJsonObject);
+    }
 
 
   /**
@@ -436,6 +528,8 @@
 
    jiboMapping = (rawJsonData, rawStoryBookState, rawJiboState) => {
 
+      console.log("jiboMapping called ......... ")
+
       
       //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD", 
       //                     Message: null, "": null, _1: null, _2: null, _3: null, _4: null }      
@@ -625,7 +719,6 @@
 
         // For STORY_LOAD subsession till next STORY_LOAD within the same HELLO_WORLD session
 
-
         helloWorldSessions.forEach((session, idx) => { // idx starts with 0
 
             let storyLoadSessions = [];
@@ -706,23 +799,29 @@
                 //--------- Add Participant------//
                 ///////////////////////////////////
 
-                if( rawJsonData[i]["Event type"] === "HELLO_WORLD" ) {
+                if( rawJsonData[i]["Event type"] === "HELLO WORLD MSG" ) {
 
-                       let rawParticipant = rawJsonData[i + 1]["Message"].split(":")[1];
-                       // test if  Participant string has single quote ('), if so remove 
-                       if( /[' "]/.test(rawParticipant) ) {
-                            rawParticipant = rawParticipant.replace(/[' "]/g, "");
+                     if(rawJsonData[i]["Message"].includes("participant_id")){
 
-                       } else if ( /['"]/.test(rawParticipant) ) {
-                            rawParticipant = rawParticipant.replace(/['"]/g, "");
-                       }
+                         let rawParticipant = rawJsonData[i]["Message"].split(":")[1];
+                         // test if  Participant string has single quote ('), if so remove 
+                         if( /[' "]/.test(rawParticipant) ) {
+                              rawParticipant = rawParticipant.replace(/[' "]/g, "");
 
-                       //-- newSheetRow["Participant"] = rawJsonData[i + 1]["Message"].split(":").pop();
-                       newSheetRow["Participant"] = rawParticipant;
+                         } else if ( /['"]/.test(rawParticipant) ) {
+                              rawParticipant = rawParticipant.replace(/['"]/g, "");
+                         }
+
+                         //-- newSheetRow["Participant"] = rawJsonData[i]["Message"].split(":").pop();
+                         newSheetRow["Participant"] = rawParticipant;
+
+                    }
 
                 } else {
 
-                       newSheetRow["Participant"] = newCleanDataSheet[i - 1]["Participant"]; 
+                      if(i != 0 ) {
+                         newSheetRow["Participant"] = newCleanDataSheet[i - 1]["Participant"]; 
+                      }
                 }
 
 
@@ -1234,6 +1333,824 @@
 
 
 
+    /**
+    * Map raw data of 3 columns to new sheet  : Datetime, Event type, Message
+    *
+    * @since 1.0.0
+    * @param {object} jsonData 
+    * @param {string} tableId
+    * @param {bool} enableRank    
+    *
+    */  
+
+   jiboMapping3col = (rawJsonData, rawStoryBookState, rawJiboState) => {
+
+      console.log("jiboMapping3col called ......... ")
+      
+      //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD", 
+      //                     Message: null}      
+      
+      //-- rawStoryBookState[0] :{ Datetime: "2020-12-11-17-35-29",  audio_playing:  False, audio_file:  "chicka_chicka_boom_boom-01-01.wav",  storybook_mode: "EXPLORE_MODE", page number:  16 }      
+      
+      //-- rawJiboState[0] :{ Datetime: "2020-12-11-17-41-39",  in_motion: "" , audio:  "",  tts_msg: "Look at all those storybooks!", volume:   "and selecting the book you want to read", led_color: "NO DATA", lookat: NO DATA , doing_motion: True , is_playing_sound: True ,  is_listening: False }
+
+
+        // To get story titles and thier total page numbers
+        let allStoryTitles = [];
+
+        for(let i = 0; i < rawStoryBookState.length; i++) {
+           if(rawStoryBookState[i]["audio_file"] != null && rawStoryBookState[i]["audio_file"].includes("-title.wav")) {
+
+               allStoryTitles.push({"audio_file": rawStoryBookState[i]["audio_file"].split("-title.wav")[0], 
+                                     "page number" : rawStoryBookState[i]["page number"]  })
+
+           }
+
+        }
+
+        // remove duplicates
+        allStoryTitles = removeFirstDuplicateByKey( allStoryTitles, "audio_file" );  
+        //-- allStoryTitles ->[ { audio_file: "chicka_chicka_boom_boom", "page number": 16 },
+        //                      { audio_file: "farm_animals", "page number": 12 } ]
+
+
+        // Map total page number of each story
+        const totalPageNumberObj = allStoryTitles.reduce((accumulator, current) => {
+            accumulator[current.audio_file] = current["page number"];
+            return accumulator;
+        }, {});
+
+        //-- totalPageNumberObj : {"chicka_chicka_boom_boom" : 16, "farm_animals" : 12,
+        //                      "geraldine_the_music_mouse" : 15, "the_little_red_hen-muldrow": 22 };
+
+
+        // To get story titles and each page and line read.
+        let storyBookStatePageLine = [];
+
+        for(let i = 0; i < rawStoryBookState.length; i++) {
+        
+           if( rawStoryBookState[i]["audio_file"] != null && 
+              !rawStoryBookState[i]["audio_file"].includes("-title.wav") &&   
+               rawStoryBookState[i]["audio_file"].includes(".wav") ) {
+
+               storyBookStatePageLine.push({
+                   "Datetime" : rawStoryBookState[i]["Datetime"],
+                   "storyTitle": rawStoryBookState[i]["audio_file"].split(".wav")[0].split("-")[0], 
+                   "curPage" :rawStoryBookState[i]["audio_file"].split(".wav")[0].split("-").slice(-2)[0], 
+                   "curLine" :rawStoryBookState[i]["audio_file"].split(".wav")[0].split("-").slice(-1)[0] })
+           }
+
+        }
+
+        // Remove duplicates date from story page line sheet
+        storyBookStatePageLine = removeFirstDuplicateByKey( storyBookStatePageLine, "Datetime" ); 
+
+
+        getStoryBookObjByDateTime = (dateTime) => {
+                let filteredResults = storyBookStatePageLine.filter(obj => obj["Datetime"] === dateTime);
+                return filteredResults.length === 0 ? null:  filteredResults[0];
+        }
+
+
+        // To get Jibo states and all Asked question 
+        let allJiboTalk = [];
+       //-- rawJiboState[0] :{ Datetime: "2020-12-11-17-41-39",  in_motion: "" , audio:  "",  tts_msg: "Look at all those storybooks!", volume:   "and selecting the book you want to read", led_color: "NO DATA", lookat: "NO DATA" , doing_motion: True , is_playing_sound: True ,  is_listening: False }        
+
+        for(let i = 0; i < rawJiboState.length; i++) {
+           if(rawJiboState[i]["tts_msg"] != null) {
+                // To remove any "<..>" e.g. "<break size=0.2/>"
+               let ttsMsg = rawJiboState[i]["tts_msg"].replace(/<[^>]*>/g, '');
+               ttsMsg = ttsMsg !== "Sup" ? ttsMsg : "";
+
+               let volMsg = "";
+               let ledColorMsg = "";
+               let lookAtMsg = ""
+
+
+               if(rawJiboState[i]["volume"] != null && rawJiboState[i]["volume"] != 0 && rawJiboState[i]["volume"] != "0") {
+                   // To remove "Bryson . "  and any "<..>"
+                   volMsg = rawJiboState[i]["volume"].replace(/<[^>]*>/g, '').replace(/Bryson \. /g, '');
+               }
+
+               if(rawJiboState[i]["led_color"] != null && rawJiboState[i]["led_color"] != "NO DATA" && rawJiboState[i]["led_color"] != 0 && rawJiboState[i]["led_color"] != "0") {
+
+                   ledColorMsg = rawJiboState[i]["led_color"].replace(/<[^>]*>/g, '');
+               }
+
+
+               if(rawJiboState[i]["lookat"] != null && rawJiboState[i]["lookat"] != "NO DATA" && rawJiboState[i]["lookat"] != 0 && rawJiboState[i]["lookat"] != "0") {
+
+                   lookAtMsg = rawJiboState[i]["lookat"].replace(/<[^>]*>/g, '');
+               }               
+
+               let jiboTalk =  ttsMsg + volMsg + ledColorMsg + lookAtMsg;
+               let isQuestion = jiboTalk.includes("?") ? true : false; 
+                
+               allJiboTalk.push({"Datetime": rawJiboState[i]["Datetime"] , 
+                                          "jiboTalk": jiboTalk, "isQuestion" : isQuestion });
+
+           }
+
+        }
+
+        // remove duplicates
+        allJiboTalk = removeFirstDuplicateByKey( allJiboTalk, "Datetime" );  
+        //-- allJiboTalk[0] ->{ Datetime: "2020-12-11-18-00-27", jiboTalk: "Give it a try! I believe in you. a farmer uses animals to protect the sheep make wool cloths make milk make meat and so on. That's a lot of animals!", isQuestion: false }
+        //  
+
+        getJiboStateObjByDateTime = (dateTime) => {
+                let filteredResults = allJiboTalk.filter(obj => obj["Datetime"] === dateTime);
+                return filteredResults.length === 0 ? null:  filteredResults[0];
+        }
+
+
+        let rawDataKeys = Object.keys(rawJsonData[0]);
+        //-- rawDataKeys : Array(3) [ "Datetime", "Event type", "Message"]
+
+
+
+        newSheetObj = {"Participant" : null, "Datetime" : null, "Date" : null, "Time" : null, 
+                      "Storybook Selected" : null, "Total Page Number" : null, "Page Number" : null, 
+                      "Line" : null, "Automatic Storytelling vs Selected Storytelling " : "", 
+                      "Seconds" : null, "Time Stopes" : "", "Time Reading " : "", "Paused" : "", 
+                      "Total Time Reading" : "",  "Total Time Paused" : "", "Total Time in Storybook" : "",  
+                      "Tutorial Response" : "",  "Tutorial Command" : "", "NEXT_PAGE Tapped " : "", 
+                      "Index/ Line Word Tapped " : "",  "Word Tapped " : "",  "Scene Object Tapped" : "", 
+                      "Jibo buttom pressed" : "", "Jibo Asked Question" : "", "Jibo Command" : "",  
+                      "Transcription or word/ image tapped " : "",  "No Response to Jibo" : "",  
+                      "Confidence level " : "", "Return to library Early" : "", "Finished Storybook" : "",
+                       "Student Logout" : "" }
+
+
+
+        let cleanDataKeys = Object.keys(newSheetObj);
+        //-- rawKeys : Array(31) [ "Participant", "Datetime", "Date", "Time", "Storybook Selected"...]
+
+
+
+        // Find HELLO_WORLD indexes, start and end of each session
+        let helloWorldStarts = [];
+        // e.g. Array(4) [ 0, 21, 27, 206 ]  indices where HELLO_WORLD started
+
+        rawJsonData.forEach((jsonRow, idx) => { // idx starts with 0
+        //e.g. jsonRow :  { Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD", Message: null }
+
+            if(jsonRow["Event type"] === "HELLO_WORLD") {
+               helloWorldStarts.push(idx);
+            }
+
+        });
+
+        console.log("HELLO_WORLD starts indices : ", helloWorldStarts);
+
+
+
+        let helloWorldSessions = [];
+        // e.g. Array(4) [ { session: 1, start: 0, end: 20, stories: null },
+        //                 { session: 2, start: 21, end: 26, stories: null }, 
+        //                 { session: 3, start: 27, end: 205, stories: null },  
+        //                 { session: 4, start: 206, end: 376, stories: null } ]    
+
+        // Each session starts with HELLO_WORD and  ends just befor next HELLO_WORLD or by the end of the sheet //.                                                                        
+
+
+        for (let i = 0; i < helloWorldStarts.length; i++) { // arrIndex starts with 0
+
+            if(i < (helloWorldStarts.length -1) ) {
+               helloWorldSessions.push({session: i+1, start: helloWorldStarts[i], end: helloWorldStarts[i+1] - 1, stories: [] });
+            } else {
+               helloWorldSessions.push({session: i+1, start: helloWorldStarts[i], end: rawJsonData.length - 1, stories: [] });
+            }
+        };
+
+        console.log("helloWorldSessions :",  helloWorldSessions);
+
+        // e.g. Array(4) [ { session: 1, start: 0, end: 20, stories: null },
+        //                 { session: 2, start: 21, end: 26, stories: null }, 
+        //                 { session: 3, start: 27, end: 205, stories: null },  
+        //                 { session: 4, start: 206, end: 376, stories: null } ]   
+
+        // Each session starts with HELLO_WORD and  ends just befor next HELLO_WORLD or by the end of the sheet //  
+
+
+        // For STORY_LOAD subsession till next STORY_LOAD within the same HELLO_WORLD session
+
+        helloWorldSessions.forEach((session, idx) => { // idx starts with 0
+
+            let storyLoadSessions = [];
+            let storyNames = [];            
+
+            for(let i = session.start; i <= session.end; i++ ) {
+
+               if( rawJsonData[i]["Event type"] === "STORY_LOADED" ) {
+
+                   storyLoadSessions.push({rawSheetIdx: i, Datetime: rawJsonData[i]["Datetime"]})   
+
+               }
+
+               if( rawJsonData[i]["Message"] != null && rawJsonData[i]["Message"].includes("story_name") && (JSON.parse(rawJsonData[i]["Message"])["story_name"] !== [] ) ) {
+                    
+                    let rawStoryName = JSON.parse(rawJsonData[i]["Message"])["story_name"];
+ 
+                    // test for single quote (') e.g. :  '"chicka_chicka_boom_boom"'
+                    if( /['"]/.test( rawStoryName ) ) {  
+                        // if true (exist), remove single quote 
+                        rawStoryName = rawStoryName.replace(/['"]/g, "")
+                        //  '"chicka_chicka_boom_boom"'  ->  "chicka_chicka_boom_boom"
+                    }
+
+                    storyNames.push( rawStoryName );
+               }               
+
+            }
+
+           session.stories.push({storyName: storyNames, storyLoadSession: storyLoadSessions });
+
+        });
+
+
+        console.log("helloWorldSessions :",  helloWorldSessions);
+
+
+      //e.g.  helloWorldSessions[3].stories => Object {storyName: [ '"chicka_chicka_boom_boom"', '"geraldine_the_music_mouse"' ], storyLoadSession: [{ rawSheetIdx: 218, Datetime: "2020-12-28-12-10-13" }, { rawSheetIdx: 330, Datetime: "2020-12-28-12-38-04" }] }
+
+
+
+        let newCleanDataSheet = [];
+
+        rawDataKeys.forEach(objKey => {
+             console.log(objKey)
+        })
+
+        let dateTimeFlag = false;
+        let newSheetCounter = 0;
+        let storyName = "unknown";
+
+        let pauseStartAt = 0;
+        let readStartAt = 0;   
+
+        let totalTimePaused = 0;
+        let totalTimeReading = 0; 
+
+
+        helloWorldSessions.forEach((session, idx) => { // idx starts with 0
+
+            let currentStoryIdx = 0;
+            let pageNumber = 1;
+            let lineNumber = 1;  
+      
+
+            console.log("session.start :", session.start);
+            console.log("session.end :", session.end);
+
+
+            for(let i = session.start; i <= session.end; i++ ) {
+
+                // clone the new Sheet obj
+                let newSheetRow = JSON.parse(JSON.stringify(newSheetObj));
+
+
+
+                ///////////////////////////////////
+                //--------- Add Participant------//
+                ///////////////////////////////////
+
+                if( rawJsonData[i]["Event type"] === "HELLO WORLD MSG" ) {
+
+                     if(rawJsonData[i]["Message"].includes("participant_id")){
+
+                         let rawParticipant = JSON.parse(rawJsonData[i]["Message"])["participant_id"];
+                         // test if  Participant string has single quote ('), if so remove 
+                         if( /[' "]/.test(rawParticipant) ) {
+                              rawParticipant = rawParticipant.replace(/[' "]/g, "");
+
+                         } else if ( /['"]/.test(rawParticipant) ) {
+                              rawParticipant = rawParticipant.replace(/['"]/g, "");
+                         }
+
+                         //-- newSheetRow["Participant"] = rawJsonData[i]["Message"].split(":").pop();
+                         newSheetRow["Participant"] = rawParticipant;
+
+                    }
+
+                } else {
+
+                      if(i != 0 ) {
+                         newSheetRow["Participant"] = newCleanDataSheet[i - 1]["Participant"]; 
+                      }
+                }
+
+
+                ///////////////////////////////////
+                //---- Datetime & Date & time----//
+                //----------- Columns -----------//
+                ///////////////////////////////////
+
+                newSheetRow["Datetime"] = rawJsonData[i]["Datetime"];
+
+                // Split the string to extract date and time parts
+                let [year, month, day, hour24, minute, second] = rawJsonData[i]["Datetime"].split("-");
+
+                // Format the date
+                let date = `${year}-${month}-${day}`;
+
+                // Format the time
+                let hour = parseInt(hour24, 10);
+                let amPm = hour >= 12 ? 'PM' : 'AM';
+                // Convert 24-hour time to 12-hour time format
+                hour12 = hour % 12;
+                hour12 = hour12 ? hour12 : 12; // the hour '0' should be '12'
+
+                // // 12 hours format  
+                // -- let time = `${hour12}:${minute}:${second} ${amPm}`;
+
+                // 24 hours format
+                let time = `${hour}:${minute}:${second}`;
+
+                newSheetRow["Date"] = date;
+                newSheetRow["Time"] = time;
+
+                // newSheetRow["Seconds"] = "00:00:01";
+                
+                if (i < session.end) {
+                   newSheetRow["Seconds"] = formatTime( parseDatetime( rawJsonData[i+1]["Datetime"] ) - parseDatetime( rawJsonData[i]["Datetime"] ) );
+                }
+
+                
+
+                ///////////////////////////////////
+                //-------Add Selected Story------//
+                //-- Storybook Selected Column --//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "HELLO_WORLD") {
+                   
+                   newSheetRow["Storybook Selected"] = "TUTORIAL";
+
+                } else { // Other then HELLO_WORLD
+
+                   // STORY LOADED -- STORY NAME SHOULD APPEAR WITH "Storybook Selected."
+                   if (rawJsonData[i]["Event type"] === "STORY_LOADED") {
+
+                           newSheetRow["Storybook Selected"] = session.stories[0].storyName[currentStoryIdx];
+
+                           // Increment story index to get next story name in that session
+                           currentStoryIdx = currentStoryIdx +1;
+
+                   } else {
+
+                       // TUTORIAL MODE
+                       if( newCleanDataSheet[i - 1]["Storybook Selected"] === "TUTORIAL" ) {
+
+                               newSheetRow["Storybook Selected"] = "TUTORIAL";
+
+                       } else { // STORY MODE
+
+                               newSheetRow["Storybook Selected"] = newCleanDataSheet[i - 1]["Storybook Selected"]
+
+                       }
+                   }                    
+                }
+
+
+
+
+                ///////////////////////////////////////////////////////
+                //-----------Add Total page, Page & line number------//
+                //-----------Automatic  vs Selected Storytelling ----//
+                ///////////////////////////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "HELLO_WORLD") {
+                   
+                   newSheetRow["Total Page Number"] = 0; 
+                   newSheetRow["Page Number"] = 0; 
+                   newSheetRow["Line"] = 0; 
+                   newSheetRow["Automatic Storytelling vs Selected Storytelling "] = ""; 
+
+                } else { // Other then HELLO_WORLD
+
+                   // STORY LOADED -- 
+                   if (rawJsonData[i]["Event type"] === "STORY_LOADED") {
+
+                           //Reinit story page number and line number with every story loaded
+                           pageNumber = 1;
+                           lineNumber = 1;
+
+                           newSheetRow["Total Page Number"] = totalPageNumberObj[ newSheetRow["Storybook Selected"] ];  
+                           newSheetRow["Page Number"] = pageNumber; 
+                           newSheetRow["Line"] = lineNumber;  
+                           newSheetRow["Automatic Storytelling vs Selected Storytelling "] = "Automatic";                          
+
+                   } else {
+
+                       // TUTORIAL MODE
+                       if( newCleanDataSheet[i - 1]["Storybook Selected"] === "TUTORIAL" ) {
+
+                               newSheetRow["Total Page Number"] = 0;  
+                               newSheetRow["Page Number"] = 0;  
+                               newSheetRow["Line"] = 0;  
+                               newSheetRow["Automatic Storytelling vs Selected Storytelling "] = "";  
+
+                       } else { // STORY MODE
+
+                              let storyPageLineObj = getStoryBookObjByDateTime(rawJsonData[i]["Datetime"]);
+                              // -- storyPageLineObj : {Datetime: 2020-12-11-17-59-06, storyTitle:farm_animals , curPage: 2, curLine: 3}
+
+                              if(storyPageLineObj != null) {
+                                   lineNumber =  parseInt(storyPageLineObj["curLine"]);
+                                   //--pageNumber =  parseInt(storyPageLineObj["curPage"]);
+                              } else {
+                                 console.log(" No Datetime matching for story page line object")
+                              }
+
+                               newSheetRow["Total Page Number"] = totalPageNumberObj[ newSheetRow["Storybook Selected"] ];  
+                               newSheetRow["Page Number"] = pageNumber;  
+                               newSheetRow["Line"] = lineNumber;  //<<<<<< correct
+
+                               // After "STORY_LOADED" session begin, if tutorial command pressed, assign pause
+                               if( (rawJsonData[i]["Event type"] === "TUTORIAL_COMMAND") || 
+                                   (rawJsonData[i]["Event type"] === "END_STORY")    ) {
+
+                                    newSheetRow["Automatic Storytelling vs Selected Storytelling "] = "Paused";   //<<<<<< correct                       
+                               } else {
+
+                                    newSheetRow["Automatic Storytelling vs Selected Storytelling "] = "Automatic";   //<<<<<< correct                       
+
+                                     // newSheetRow["Automatic Storytelling vs Selected Storytelling "] = 
+                                     //    newCleanDataSheet[i - 1]["Automatic Storytelling vs Selected Storytelling "];                  
+                               }
+
+
+                       }
+
+                       // increment page num 
+                       if (rawJsonData[i]["Event type"] === "NEXT_PAGE") {
+                               pageNumber = pageNumber + 1;
+                       }
+
+                       // increment line number 
+                       // code to add
+
+                   } 
+
+                }
+
+
+
+                //////////////////////////////////
+                //---------Add Time Stopes------//
+                //////////////////////////////////
+                                      
+                // Check when Automatic  Storytelling  change to paused and stopped, and vice versa                    
+                //-- if(newSheetRow["Automatic Storytelling vs Selected Storytelling "] !== "") {
+                if(newCleanDataSheet.length > 1) {
+
+                   let prevState = newCleanDataSheet[i - 1]["Automatic Storytelling vs Selected Storytelling "];
+                   let currentState = newSheetRow["Automatic Storytelling vs Selected Storytelling "];
+
+                   if(prevState === "") {
+                          readStartAt = 0;
+                          pauseStartAt = 0;
+                          totalTimePaused = 0;
+                          totalTimeReading = 0;                          
+                   }                    
+                   
+                   if( ( currentState !== prevState )  ) {
+ 
+                         if(currentState === "Paused") {
+                             pauseStartAt  = newSheetRow["Datetime"];
+                         }
+
+                         if(currentState === "Automatic") {
+                            readStartAt  = newSheetRow["Datetime"];
+
+                         }   
+
+                         if(prevState !== "" &&  currentState !== "") {
+                            newSheetRow["Time Stopes"] = newSheetRow["Time"];
+                         }                      
+                   }
+
+                }
+
+
+
+                /////////////////////////////////////////////
+                //--------- Time Reading and Paused -------//
+                /////////////////////////////////////////////
+                                      
+                //-- if(newSheetRow["Automatic Storytelling vs Selected Storytelling "] !== "") {
+
+                if(newCleanDataSheet.length > 1) {
+
+                   let prevState =newCleanDataSheet[i - 1]["Automatic Storytelling vs Selected Storytelling "];
+                   let currentState = newSheetRow["Automatic Storytelling vs Selected Storytelling "];
+                   
+                   if( ( currentState !== prevState ) && (prevState !== "" ) ) {
+                        
+                         if(currentState === "Paused" && readStartAt != 0) {
+                             let timeReading = parseDatetime( newSheetRow["Datetime"] ) - parseDatetime( readStartAt );
+                             newSheetRow["Time Reading "] = formatTime( timeReading );
+                             totalTimeReading = totalTimeReading + timeReading;
+                         }
+
+                         if(currentState === "Automatic" && pauseStartAt != 0) {
+                            let timePaused = parseDatetime( newSheetRow["Datetime"] ) - parseDatetime( pauseStartAt );
+                            newSheetRow["Paused"] = formatTime( timePaused );
+                            totalTimePaused = totalTimePaused + timePaused;
+                         }  
+
+                         if(currentState === "" && prevState === "Automatic") {
+                             let timeReading = parseDatetime( newCleanDataSheet[i - 1]["Datetime"] ) - parseDatetime( readStartAt );
+                             newSheetRow["Time Reading "] = formatTime( timeReading );
+                             totalTimeReading = totalTimeReading + timeReading;
+                             newSheetRow["Total Time Reading"] = formatTime(totalTimeReading);
+                             newSheetRow["Total Time Paused"] = formatTime(totalTimePaused);
+                             newSheetRow["Total Time in Storybook"] = formatTime(totalTimePaused + totalTimeReading);
+
+                         }
+
+                         if(currentState === "" && prevState === "Paused") {
+                            let timePaused = parseDatetime( newCleanDataSheet[i - 1]["Datetime"] ) - parseDatetime( pauseStartAt );
+                            newSheetRow["Paused"] = formatTime(timePaused);
+                            totalTimePaused = totalTimePaused + timePaused;
+                            newSheetRow["Total Time Paused"] = formatTime(totalTimePaused);
+                            newSheetRow["Total Time Reading"] = formatTime(totalTimeReading);
+                            newSheetRow["Total Time in Storybook"] = formatTime(totalTimePaused + totalTimeReading);
+                         }                                                  
+
+                   } 
+
+                }
+
+
+
+
+                ///////////////////////////////////
+                //----- Add Tutorial Response ---//
+                //-- Tutorial Response Column  --//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "BUTTON_PRESSED") {
+                   
+                   newSheetRow["Tutorial Response"] = "BUTTON_PRESSED";
+
+                }
+
+
+                ///////////////////////////////////
+                //----- Add Tutorial Command ---//
+                //-- Tutorial Command Column  --//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "TUTORIAL_COMMAND") {
+                   
+                   newSheetRow["Tutorial Command"] = "TUTORIAL_COMMAND";
+
+                }
+
+
+
+
+                ///////////////////////////////////
+                //----- Add Next page Command ---//
+                //------- Next page Column  -----//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] != null && rawJsonData[i]["Event type"] === "NEXT_PAGE") {
+                   
+                   newSheetRow["NEXT_PAGE Tapped "] = "NEXT_PAGE";
+                }
+
+
+
+                /////////////////////////////////////
+                //-Index/ Line Word Tapped Column -//
+                /////////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] != null && rawJsonData[i]["Event type"] === "WORD_TAPPED" ) { 
+                   
+                   newSheetRow["Index/ Line Word Tapped "] = '"index":' + JSON.parse(rawJsonData[i]["Message"])["index"]
+
+                }
+
+
+                if(rawJsonData[i]["Event type"] != null && rawJsonData[i]["Event type"] === "HIGHLIGHT_WORD"  ) { 
+                   
+                   newSheetRow["Index/ Line Word Tapped "] = '"indexes":' + JSON.parse(rawJsonData[i]["Message"])["indexes"]
+
+                }
+
+                /////////////////////////////////////
+                //------ Word Tapped  Column ------//
+                /////////////////////////////////////
+
+                if(rawJsonData[i]["Message"] != null && rawJsonData[i]["Message"].includes("word:") ) { 
+                   
+                   newSheetRow["Word Tapped "] = JSON.parse(rawJsonData[i]["Message"])["word"];
+
+                }
+
+
+
+                /////////////////////////////////////
+                //--- Scene Object Tapped Column---//
+                /////////////////////////////////////
+
+                if(rawJsonData[i]["Message"] != null && rawJsonData[i]["Message"].includes("label:") ) { 
+                   
+                   newSheetRow["Scene Object Tapped"] = JSON.parse(rawJsonData[i]["Message"])["label"];
+
+                }
+
+
+
+                ///////////////////////////////////
+                //--Jibo buttom pressed Column---//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "JIBO_QUESTION_ASKING_ACTIVITY") {
+                   
+                   newSheetRow["Jibo buttom pressed"] = "JIBO_QUESTION_ASKING_ACTIVITY";
+
+                }
+
+
+
+                ///////////////////////////////////
+                //--Jibo Asked Question Column---//
+                ///////////////////////////////////
+
+
+                let jiboTalkObj = getJiboStateObjByDateTime(rawJsonData[i]["Datetime"]);
+                // -- jiboTalkObj : { Datetime: "2020-12-11-18-05-13", jiboTalk: "What does it mean to reap the wheat? ", isQuestion: true }
+
+                if(jiboTalkObj != null) {
+
+                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"];
+                } else {
+                   console.log(" No Datetime matching for Jibo state talking object")
+                }
+
+                   
+   
+
+                ///////////////////////////////////
+                //----- Jibo Command Column -----//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "Receive Listen Command") {
+                   
+                   newSheetRow["Jibo Command"] = "Receive Listen Command";
+
+                }
+
+
+
+                //////////////////////////////////////////////////
+                //- Transcription or word/ image tapped  Column-//
+                //////////////////////////////////////////////////
+
+                // -- /[{}:]/.test(someString) will check if that string has any of the those characers {, }, :
+
+                if(rawJsonData[i]["Message"] !== "NOSPEECH" &&  rawJsonData[i]["Message"] != null &&
+                   !rawJsonData[i]["Message"].includes("Explore mode") && ! /[{}:]/.test(rawJsonData[i]["Message"])) { 
+                   
+                   newSheetRow["Transcription or word/ image tapped "] = rawJsonData[i]["Message"];
+
+                }
+
+
+                ///////////////////////////////////
+                //--No Response to Jibo Column --//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Message"] === "NOSPEECH" || rawJsonData[i]["Message"].includes("NOSPEECH") ) {
+                   
+                   newSheetRow["No Response to Jibo"] = "NOSPEECH";
+
+                }
+
+
+
+
+                ///////////////////////////////////
+                //--- Confidence level  Column---//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "?????????????") {     /// <<<<<<<<<
+                   
+                   newSheetRow["Confidence level "] = "?????";
+
+                }                                
+
+
+
+
+                ///////////////////////////////////
+                //-Return to library Early Column-//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "RETURN_TO_LIBRARY_EARLY") {
+                   
+                   newSheetRow["Return to library Early"] = "RETURN_TO_LIBRARY_EARLY";
+
+                }
+
+
+
+                ///////////////////////////////////
+                //---Finished Storybook Column---//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "END_STORY") {
+                   
+                   newSheetRow["Finished Storybook"] = "END_STORY";
+
+                }
+
+
+                ///////////////////////////////////
+                //---Student Logout Column---//
+                ///////////////////////////////////
+
+                if(rawJsonData[i]["Event type"] === "STUDENT_LOGOUT") {
+                   
+                   newSheetRow["Student Logout"] = "STUDENT_LOGOUT";
+
+                }
+
+
+
+                // Other commands to consider: 
+                // END_STORY    ->  can affect page number
+                // RETURN_TO_LIBRARY_EARLY ->  can affect page number
+                // STUDENT_LOGOUT    ->   can affect page number 
+
+
+
+                ///////////////////////////////////
+                //----- Add to clean sheet-------//
+                ///////////////////////////////////
+
+
+                newCleanDataSheet.push(newSheetRow);  
+
+
+
+            }
+            
+
+         });
+
+
+         //// Remove first duplicates from newCleanDataSheet 
+         // newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
+ 
+
+
+         // Merging similar Datetime rows
+         for( let idx = 1; idx < newCleanDataSheet.length; idx ++) {
+
+            if(newCleanDataSheet[idx]["Datetime"] === newCleanDataSheet[idx - 1]["Datetime"]) {
+
+                 cleanDataKeys.forEach(key => {
+                      //--key one of Array(31) [ "Participant", "Datetime", "Date", "Time", ..]
+                      if(newCleanDataSheet[idx][key] !== newCleanDataSheet[idx - 1][key] ) {
+                               if(newCleanDataSheet[idx][key] == null || newCleanDataSheet[idx][key] === "") {
+                                  // since current row cell is empty, and previous row cell is not, copy the value of previous cell into current row cell
+                                  newCleanDataSheet[idx][key] = newCleanDataSheet[idx - 1][key];
+                               }
+
+                      }
+
+                 })
+                 
+            }
+         }
+ 
+
+          // Remove deplicate Datetime rows
+         for( let idx = 0; idx < newCleanDataSheet.length -1; ) {
+
+            if(newCleanDataSheet[idx + 1]["Datetime"] === newCleanDataSheet[idx]["Datetime"]) {
+              
+               newCleanDataSheet.splice(idx, 1);
+            } else {
+
+               idx =  idx +1;
+            }
+         }
+
+         //// Remove first duplicates from newCleanDataSheet 
+         //-- newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
+
+
+        return  newCleanDataSheet;
+
+   }
+
+
     ///////////////////////////////////////
     //////////--------WEBIX------//////////
     ///////////////////////////////////////
@@ -1248,15 +2165,19 @@
       let enableRankFlag = false;
       
       // For lage csv like storybookState and jiboState
-      let  enableDataSampling = false;
+      let enableDataSampling = false;
       let numOfSamples = 10;
 
-      let swTimeOut = 1000;     
-      let rawCsvFileName = '';
+      let swTimeOut = 1000;   
+
+      let rawCsvFileNames = [];
+      //--rawCsvFileNames : Array [ "storybook_event.csv", "storybook_command.csv" ]
+      rawCsvFileContents = [];
+
       let StorybookStateFileName = '';
       let jiboStateFileName = '';
 
-      let rawJsonData = [];
+      rawJsonData = [];
       //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD", 
       //                     Message: null, "": null, _1: null, _2: null, _3: null, _4: null }      
       let rawStoryBookState = [];
@@ -1304,49 +2225,114 @@
                            align: "left",
                            accept: "text/csv",
                            autosend: false, 
-                           multiple: false, 
+                           multiple: true, 
                            on: {        
                                 onBeforeFileAdd: function(upload) {        
                                   let file = upload.file;
-                                  rawCsvFileName = file;
-                                  // File { name: "combined104.csv", lastModified: 1704578818136, webkitRelativePath: "", size: 31419, type: "text/csv" }
-                                 // rawCsvFileName['name']= "combined104.csv"
+                                  //File { name: "combined104.csv", lastModified: 1704578818136, webkitRelativePath: "", size: 31419, type: "text/csv" }
+
+                                  rawCsvFileNames.push(file.name);
+                                  //--rawCsvFileNames: Array["storybook_event.csv", "storybook_command.csv"]
+                                  //--OR
+                                  //--rawCsvFileNames : Array["combined104.csv"]
 
                                   let reader = new FileReader();  
+
                                   reader.onloadend = function(event) {
 
                                       if (event.target.readyState === FileReader.DONE) {
 
-                                         const delimiter = detectDelimiter(event.target.result);
+                                          rawCsvFileContents.push(event.target.result);
 
-                                         // Convert CSV data to JSON
-                                         rawJsonData = convertCsv2Json(event.target.result, delimiter); 
-                                         console.log(event.target.result)
-                                         console.log(" test here ------")
-                                         console.log("rawJsonData :", rawJsonData)
-                                         //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD",    Message: null, "": null, _1: null, _2: null, _3: null, _4: null }  
+                                          if (rawCsvFileContents.length === 2) { 
+                                          // 2 files are selected "storybook_event.csv", "storybook_command.csv"
 
-                                         webix.message({
-                                            text: file['name'] + " loaded.",
-                                            expire: 5000, // time in milliseconds after which the message will disappear
-                                            type: "info",
-                                            css: "my-popup"
-                                         });              
+                                              if(rawCsvFileNames[0] === "storybook_event.csv" && 
+                                                 rawCsvFileNames[1] === "storybook_command.csv") {
 
-                                         // Open  RAW CSV tab 
-                                         // $$("tabview").setValue("rawCsvTab");
+                                                   console.log("Correct file orders");
+                                                   rawJsonData = combineAndSortFiles(rawCsvFileContents);
+                                                  
 
-                                         $$("rawCsvUploader").disable();                                         
+                                              } else if(rawCsvFileNames[1] === "storybook_event.csv" &&
+                                                        rawCsvFileNames[0] === "storybook_command.csv") {
 
-                                         // Draw table with Raw tab for visualization 
-                                         convert2Table(rawJsonData, "rawCsvTableId", enableRankFlag,true);
-                                      
+                                                         console.log("Incorrect files orders, needs swaping");
 
+                                                         // Swap names
+                                                         let tempName = rawCsvFileNames[0];
+                                                         rawCsvFileNames[0] = rawCsvFileNames[1]
+                                                         rawCsvFileNames[1] = tempName;
 
-                                         // Check if all needed CSV fils uploaded 
-                                         if(checkAllUpload()) {
-                                               $$("convertBtn").enable();
-                                         }
+                                                         //Swap contents
+                                                         let tempContents = rawCsvFileContents[0];
+                                                         rawCsvFileContents[0] = rawCsvFileContents[1];
+                                                         rawCsvFileContents[1] = tempContents;
+
+                                                         rawJsonData = combineAndSortFiles(rawCsvFileContents);
+
+                                              } else {
+                                                    alert('Please select 2 files: storybook_event.csv and storybook_command.csv');
+                                                    return;
+                                              }
+                                              
+
+                                          } 
+
+                                          if (rawCsvFileContents.length === 1) { // one csv file e.g. combine104.csv
+
+                                               if(rawCsvFileNames[0] !== "storybook_event.csv" && rawCsvFileNames[0] !== "storybook_command.csv") {
+
+                                                   const delimiter = detectDelimiter(event.target.result);
+
+                                                   // Convert CSV data to JSON
+                                                   rawJsonData = convertCsv2Json(event.target.result, delimiter); 
+                                                   console.log(event.target.result)
+                                                   console.log(" test here ------")
+                                                   console.log("rawJsonData :", rawJsonData)
+                                                   //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD",    Message: null, "": null, _1: null, _2: null, _3: null, _4: null }  
+
+                                                   
+                                                   // if "Message" need split  
+                                                   if(Object.keys(rawJsonData[0]).length == 3) {
+                                                      // Transform the JSON array
+                                                      // rawJsonData = transformJsonArray(rawJsonData);
+                                                   }  
+                                               }  else {
+
+                                                       return;
+                                               }
+
+                                          } 
+
+                                          // if rawJsonData found from uploaded file/s
+                                          if( ( Object.keys(rawJsonData[0]).length >= 3 ) && 
+                                              (rawJsonData.length > 1)  ) {
+
+                                                 webix.message({
+                                                    text: rawCsvFileNames + " uploaded.",
+                                                    expire: 5000, // time in milliseconds after which the message will disappear
+                                                    type: "info",
+                                                    css: "my-popup"
+                                                 });              
+
+                                                 // Open  RAW CSV tab 
+                                                 // $$("tabview").setValue("rawCsvTab");
+
+                                                 $$("rawCsvUploader").disable();                                         
+                                                 // Draw table with Raw tab for visualization 
+                                                 convert2Table(JSON.parse(JSON.stringify(rawJsonData)), "rawCsvTableId", enableRankFlag,true);
+
+                                              
+                                                 // Check if all needed CSV fils uploaded 
+                                                 if(checkAllUpload()) {
+                                                       $$("convertBtn").enable();
+                                                 }  
+
+                                          } else {
+                                                    alert('No valid raw csv file/files uploaded ...');
+                                                    return;
+                                          }
                                       }
                                   };
 
@@ -1409,7 +2395,7 @@
                                              convert2Table(rawStoryBookState.slice(0, numOfSamples), "storyStateTableId", enableRankFlag, true);
                                          } else {
                                              // Tabulate  all CSV data 
-                                             convert2Table(rawStoryBookState, "storyStateTableId", enableRankFlag, "header");
+                                             convert2Table(JSON.parse(JSON.stringify(rawStoryBookState)), "storyStateTableId", enableRankFlag, "header");
                                          }
 
 
@@ -1449,7 +2435,7 @@
                                   let file = upload.file;
                                   jiboStateFileName = file;
                                   //file { name: "c201_0_jibostate_Combined.csv", lastModified: 1548792883000, webkitRelativePath: "", size: 503010, type: "text/csv" }
-                                 // rawCsvFileName['name']= "c201_0_jibostate_Combined.csv"
+                                 // file['name']= "c201_0_jibostate_Combined.csv"
 
                                   let reader = new FileReader();  
                                   reader.onloadend = function(event) {
@@ -1479,7 +2465,7 @@
                                              convert2Table(rawJiboState.slice(0, numOfSamples), "jiboStateTableId", enableRankFlag, true);
                                          } else {
                                              // Tabulate  all CSV data 
-                                             convert2Table(rawJiboState, "jiboStateTableId", enableRankFlag, "header");
+                                             convert2Table(JSON.parse(JSON.stringify(rawJiboState)), "jiboStateTableId", enableRankFlag, "header");
                                          }
                                       
                                          
@@ -1516,10 +2502,21 @@
 
                               on:{        
                                onChange: function(newValue, oldValue, config) {   
-                                    if(newValue) {
-                                         newCleanCSVSheet = jiboMapping(rawJsonData, rawStoryBookState, rawJiboState);
 
-                                         convert2Table(newCleanCSVSheet, "newCsvTableId", enableRankFlag, true);
+                                    if(newValue) {
+
+                                         if(Object.keys(rawJsonData[0]).length == 3) {
+                                             //-- 3 col : "Datetime" "Event type" "Message"
+                                            newCleanCSVSheet = jiboMapping3col(rawJsonData, rawStoryBookState, rawJiboState);
+
+                                         } else {
+                                            //-- More then 3 col : "Datetime" "Event type" "Message", "_1" "_2" "_3" etc
+                                            newCleanCSVSheet = jiboMapping(rawJsonData, rawStoryBookState, rawJiboState);
+
+                                         } 
+
+
+                                         convert2Table(JSON.parse(JSON.stringify(newCleanCSVSheet)), "newCsvTableId", enableRankFlag, true);
 
                                          if(newCleanCSVSheet.length) {
                                               $$("downloadBtn").enable();
@@ -1688,7 +2685,8 @@
          
               if( $$("convertBtn").getValue() ) {
 
-                 rawCsvFileName = '';
+                 rawCsvFileNames = [];
+                 rawCsvFileContents = [];
                  StorybookStateFileName = '';
                  jiboStateFileName = '';
                  rawJsonData = [];
