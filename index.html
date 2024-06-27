@@ -799,6 +799,8 @@
         let totalTimePaused = 0;
         let totalTimeReading = 0; 
 
+        let currentParticipant = "";
+
 
         helloWorldSessions.forEach((session, idx) => { // idx starts with 0
 
@@ -837,6 +839,7 @@
 
                          //-- newSheetRow["Participant"] = rawJsonData[i]["Message"].split(":").pop();
                          newSheetRow["Participant"] = rawParticipant;
+                         currentParticipant = rawParticipant;
 
                     }
 
@@ -1348,6 +1351,9 @@
          //-- newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
 
 
+        $$("fileNameToDL").setValue( currentParticipant + "_" + newCleanDataSheet[0]["Datetime"] + ".csv"); 
+
+
         return  newCleanDataSheet;
 
    }
@@ -1615,6 +1621,8 @@
         let totalTimePaused = 0;
         let totalTimeReading = 0; 
 
+        let currentParticipant = "";
+
 
         helloWorldSessions.forEach((session, idx) => { // idx starts with 0
 
@@ -1653,6 +1661,7 @@
 
                          //-- newSheetRow["Participant"] = rawJsonData[i]["Message"].split(":").pop();
                          newSheetRow["Participant"] = rawParticipant;
+                         currentParticipant = rawParticipant;
 
                     }
 
@@ -2168,6 +2177,8 @@
          //// Remove first duplicates from newCleanDataSheet 
          //-- newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
 
+
+        $$("fileNameToDL").setValue( currentParticipant + "_" + newCleanDataSheet[0]["Datetime"] + ".csv"); 
 
         return  newCleanDataSheet;
 
