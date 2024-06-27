@@ -2394,39 +2394,51 @@
 
                                       if (event.target.readyState === FileReader.DONE) {
 
-                                         const delimiter = detectDelimiter(event.target.result);
+                                            // Check the header of the file
+                                            const expectedHeader1 = "Datetime;audio_playing;audio_file;storybook_mode;page number";
+                                            const expectedHeader2 = "Datetime,audio_playing,audio_file,storybook_mode,page number";                                            
+                                            const fileHeader = event.target.result.split('\n')[0].trim();
 
-                                         // Convert CSV data to JSON
-                                         rawStoryBookState = convertCsv2Json(event.target.result, delimiter); 
-                                         //-- rawStoryBookState[0] :{ Datetime: "2020-12-11-17-35-29",  audio_playing:  False, audio_file:  "chicka_chicka_boom_boom-01-01.wav",  storybook_mode: "EXPLORE_MODE", page number:  16 }                                         
+                                          
+                                            if (fileHeader.includes(expectedHeader1) ||  fileHeader.includes(expectedHeader2) ) {
 
-                                         webix.message({
-                                            text: file['name'] + " loaded.",
-                                            expire: 5000, // time in milliseconds after which the message will disappear
-                                            type: "info",
-                                            css: "my-popup"
-                                         });
+                                                 const delimiter = detectDelimiter(event.target.result);
 
-                                         // Open  STORY STATE SAMPLE tab 
-                                         // $$("tabview").setValue("storyStateSampleTab");
+                                                 // Convert CSV data to JSON
+                                                 rawStoryBookState = convertCsv2Json(event.target.result, delimiter); 
+                                                 //-- rawStoryBookState[0] :{ Datetime: "2020-12-11-17-35-29",  audio_playing:  False, audio_file:  "chicka_chicka_boom_boom-01-01.wav",  storybook_mode: "EXPLORE_MODE", page number:  16 }                                         
 
-    
-                                         $$("storyStateCsvUploader").disable();
+                                                 webix.message({
+                                                    text: file['name'] + " loaded.",
+                                                    expire: 5000, // time in milliseconds after which the message will disappear
+                                                    type: "info",
+                                                    css: "my-popup"
+                                                 });
 
-                                         // Tabulate CSV data with Raw tab for visualization 
-                                         if(enableDataSampling) {
-                                             convert2Table(JSON.parse(JSON.stringify(rawStoryBookState.slice(0, numOfSamples) )), "storyStateTableId", enableRankFlag, true);
-                                         } else {
-                                             // Tabulate  all CSV data 
-                                             convert2Table(JSON.parse(JSON.stringify(rawStoryBookState)), "storyStateTableId", enableRankFlag, "header");
-                                         }
+                                                 // Open  STORY STATE SAMPLE tab 
+                                                 // $$("tabview").setValue("storyStateSampleTab");
+
+            
+                                                 $$("storyStateCsvUploader").disable();
+
+                                                 // Tabulate CSV data with Raw tab for visualization 
+                                                 if(enableDataSampling) {
+                                                     convert2Table(JSON.parse(JSON.stringify(rawStoryBookState.slice(0, numOfSamples) )), "storyStateTableId", enableRankFlag, true);
+                                                 } else {
+                                                     // Tabulate  all CSV data 
+                                                     convert2Table(JSON.parse(JSON.stringify(rawStoryBookState)), "storyStateTableId", enableRankFlag, "header");
+                                                 }
 
 
 
-                                         // Check if all needed CSV fils uploaded
-                                         if(checkAllUpload()) {
-                                               $$("convertBtn").enable();
-                                         }
+                                                 // Check if all needed CSV fils uploaded
+                                                 if(checkAllUpload()) {
+                                                       $$("convertBtn").enable();
+                                                 }
+                                            } else {
+
+                                                 alert('Incorrect file uploaded. Please upload the correct storybook state CSV file (e.g. storybook_state.csv).');
+                                            }
 
                                       }
                                   };
@@ -2465,39 +2477,49 @@
 
                                       if (event.target.readyState === FileReader.DONE) {
 
-                                         const delimiter = detectDelimiter(event.target.result);
+                                          // Check the header of the file
+                                          const expectedHeader1 = "Datetime;in_motion;audio;tts_msg;volume;led_color;lookat;doing_motion;is_playing_sound;is_listening";
+                                          const expectedHeader2 = "Datetime,in_motion,audio,tts_msg,volume,led_color,lookat,doing_motion,is_playing_sound,is_listening";                                          
+                                          const fileHeader = event.target.result.split('\n')[0].trim();
 
-                                         // Convert CSV data to JSON
-                                         rawJiboState = convertCsv2Json(event.target.result, delimiter); 
-                                         //-- rawJiboState[0] :{ Datetime: "2020-12-11-17-41-39",  in_motion: "" , audio:  "",  tts_msg: "Look at all those storybooks!", volume:   "and selecting the book you want to read", led_color: "NO DATA", lookat: NO DATA , doing_motion: True , is_playing_sound: True ,  is_listening: False }
+                                          if (fileHeader.includes(expectedHeader1) ||  fileHeader.includes(expectedHeader2) ) {
+                                          
+                                               const delimiter = detectDelimiter(event.target.result);
 
-                                         webix.message({
-                                            text: file['name'] + " loaded.",
-                                            expire: 5000, // time in milliseconds after which the message will disappear
-                                            type: "info",
-                                            css: "my-popup"
-                                         });    
+                                               // Convert CSV data to JSON
+                                               rawJiboState = convertCsv2Json(event.target.result, delimiter); 
+                                               //-- rawJiboState[0] :{ Datetime: "2020-12-11-17-41-39",  in_motion: "" , audio:  "",  tts_msg: "Look at all those storybooks!", volume:   "and selecting the book you want to read", led_color: "NO DATA", lookat: NO DATA , doing_motion: True , is_playing_sound: True ,  is_listening: False }
 
-                                         // open JIBO STATE SAMPLE tab 
-                                         // $$("tabview").setValue("jiboStateSampleTab");                                     
+                                               webix.message({
+                                                  text: file['name'] + " loaded.",
+                                                  expire: 5000, // time in milliseconds after which the message will disappear
+                                                  type: "info",
+                                                  css: "my-popup"
+                                               });    
 
-                                         $$("jiboStateCsvUploader").disable();
+                                               // open JIBO STATE SAMPLE tab 
+                                               // $$("tabview").setValue("jiboStateSampleTab");                                     
 
-                                         // Tabulate JSON data with Raw tab for visualization 
-                                         if(enableDataSampling) {
-                                             convert2Table(JSON.parse(JSON.stringify(rawJiboState.slice(0, numOfSamples) )), "jiboStateTableId", enableRankFlag, true);
-                                         } else {
-                                             // Tabulate  all CSV data 
-                                             convert2Table(JSON.parse(JSON.stringify(rawJiboState)), "jiboStateTableId", enableRankFlag, "header");
-                                         }
-                                      
-                                         
+                                               $$("jiboStateCsvUploader").disable();
 
-                                         // Check if all needed CSV fils uploaded
-                                         if(checkAllUpload()) {
-                                               $$("convertBtn").enable();
-                                         }
+                                               // Tabulate JSON data with Raw tab for visualization 
+                                               if(enableDataSampling) {
+                                                   convert2Table(JSON.parse(JSON.stringify(rawJiboState.slice(0, numOfSamples) )), "jiboStateTableId", enableRankFlag, true);
+                                               } else {
+                                                   // Tabulate  all CSV data 
+                                                   convert2Table(JSON.parse(JSON.stringify(rawJiboState)), "jiboStateTableId", enableRankFlag, "header");
+                                               }
+                                            
+                                               
 
+                                               // Check if all needed CSV fils uploaded
+                                               if(checkAllUpload()) {
+                                                     $$("convertBtn").enable();
+                                               }
+                                          } else {
+
+                                               alert('Incorrect file uploaded. Please upload the correct jibo state  CSV file (e.g. jibo_state.csv).');
+                                          }
                                       }
                                   };
 
