@@ -103,7 +103,30 @@
  
   <script>
 
-
+    /**
+    * Function to use with checking output file name, it must start with letter a-z or A-Z
+    *
+    * @function
+    * @memberof HistoJS
+    * @since 1.0.0
+    * @version 1.0.0
+    * @param {*} ch - character to check
+    * @returns {boolean} Returns - true or false
+    * @example
+    *
+    * isLetter(3)
+    * => false
+    *
+    * isLetter("A")
+    * => true
+    *
+    * isLetter("$")
+    * => false
+    */
+     
+      isLetter = (ch) => {
+          return (/[a-zA-Z]/).test(ch)
+      } 
 
   /**
    *  Function to convert datetime string to a Date object
@@ -2392,7 +2415,7 @@
 
                                          // Tabulate CSV data with Raw tab for visualization 
                                          if(enableDataSampling) {
-                                             convert2Table(rawStoryBookState.slice(0, numOfSamples), "storyStateTableId", enableRankFlag, true);
+                                             convert2Table(JSON.parse(JSON.stringify(rawStoryBookState.slice(0, numOfSamples) )), "storyStateTableId", enableRankFlag, true);
                                          } else {
                                              // Tabulate  all CSV data 
                                              convert2Table(JSON.parse(JSON.stringify(rawStoryBookState)), "storyStateTableId", enableRankFlag, "header");
@@ -2462,7 +2485,7 @@
 
                                          // Tabulate JSON data with Raw tab for visualization 
                                          if(enableDataSampling) {
-                                             convert2Table(rawJiboState.slice(0, numOfSamples), "jiboStateTableId", enableRankFlag, true);
+                                             convert2Table(JSON.parse(JSON.stringify(rawJiboState.slice(0, numOfSamples) )), "jiboStateTableId", enableRankFlag, true);
                                          } else {
                                              // Tabulate  all CSV data 
                                              convert2Table(JSON.parse(JSON.stringify(rawJiboState)), "jiboStateTableId", enableRankFlag, "header");
