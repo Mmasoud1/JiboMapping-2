@@ -1722,7 +1722,7 @@
                 } else { // Other then HELLO_WORLD
 
                    // STORY LOADED -- STORY NAME SHOULD APPEAR WITH "Storybook Selected."
-                   if (rawJsonData[i]["Event type"] === "STORY_LOADED") {
+                   if (rawJsonData[i]["Event type"] === "STORY_LOADED" || rawJsonData[i]["Event type"] === "STORY_SELECTED") {
 
                            newSheetRow["Storybook Selected"] = session.stories[0].storyName[currentStoryIdx];
 
@@ -2591,6 +2591,7 @@
        downloadNewCsv = (outCsvFileName) => {
              df = new dfd.DataFrame(newCleanCSVSheet);
              dfd.toCSV(df, { download: true, fileName:  outCsvFileName  });
+           
        }
 
 
