@@ -32,6 +32,7 @@
   <script src="js/libs/Dropbox-sdk.min.js"></script>
   <script src="js/libs/jquery-3.5.1.js"></script>
   <script src="js/libs/papaparse.min.js"></script>  
+  <script src="https://unpkg.com/dropbox/dist/Dropbox-sdk.min.js"></script>
 
 
 <style>
@@ -102,6 +103,61 @@
 <body>
  
   <script>
+
+    //*************************************** Dropbox JSON Access *******************************************//
+    var ACCESS_TOKEN = 'sl.B77EDOZWTSZpgDl0O_qQY9CBDsVjwGf6gJP_MKwSM653C8NctIeSuTYlecIa2P-qHW0Jhdrj5ZM53oZJT1dF7XMq8Fuaabni4BtEen-LU_WwKwDY5gSR36-5h3zFRRsnDrZCfQwLm9WDsYJ8tVs1rbk'; 
+
+    var dbx = new Dropbox.Dropbox({ accessToken: ACCESS_TOKEN });   
+
+    // async function getJsonData() {
+    //     try {
+    //         const json = await readJsonFile('/chicka_chicka_boom_boom/chicka_chicka_boom_boom_00.json');
+    //         return json; // You can return or use the JSON object as needed
+    //     } catch (error) {
+    //         console.error('Error fetching JSON data:', error);
+    //         return null; // Handle the error as needed
+    //     }
+    // }
+
+
+    async function readJsonFile(fileName) {
+        try {
+            const response = await dbx.filesDownload({ path: '/qna_json_merged' + fileName });
+            const blob = response.result.fileBlob || response.result.fileBinary || response.fileBlob || response.fileBinary;
+
+            const reader = new FileReader();
+
+            return new Promise((resolve, reject) => {
+                reader.onload = function(event) {
+                    try {
+                        const json = JSON.parse(event.target.result);
+                        resolve(json); // Resolve the promise with the JSON object
+                    } catch (error) {
+                        reject(error); // Reject the promise in case of error
+                    }
+                };
+
+                reader.onerror = function() {
+                    reject(new Error('FileReader failed')); // Handle file reading errors
+                };
+
+                reader.readAsText(blob);
+            });
+        } catch (error) {
+            console.error('Error:', error);
+            throw error; // Re-throw the error to be handled by the caller
+        }
+    }
+
+
+
+    // readJsonFile('/chicka_chicka_boom_boom/chicka_chicka_boom_boom_00.json').then(json => {
+    //    console.log(json);
+    // });
+
+    //******************************************************************************************************//   
+
+
 
     /**
     * Function to use with checking output file name, it must start with letter a-z or A-Z
@@ -979,7 +1035,8 @@
 
                                // After "STORY_LOADED" session begin, if tutorial command pressed, assign pause
                                if( (rawJsonData[i]["Event type"] === "TUTORIAL_COMMAND") || 
-                                   (rawJsonData[i]["Event type"] === "END_STORY")    ) {
+                                   (rawJsonData[i]["Event type"] === "END_STORY")  ||  
+                                   (rawJsonData[i]["Event type"] === "STUDENT_LOGOUT") ) {
 
                                     newSheetRow["Automatic Storytelling vs Selected Storytelling "] = "Paused";   //<<<<<< correct                       
                                } else {
@@ -1192,7 +1249,7 @@
 
                 if(jiboTalkObj != null) {
 
-                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"];
+                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"].replace(/,/g, ";");;
                 } else {
                    console.log(" No Datetime matching for Jibo state talking object")
                 }
@@ -1801,7 +1858,8 @@
 
                                // After "STORY_LOADED" session begin, if tutorial command pressed, assign pause
                                if( (rawJsonData[i]["Event type"] === "TUTORIAL_COMMAND") || 
-                                   (rawJsonData[i]["Event type"] === "END_STORY")    ) {
+                                   (rawJsonData[i]["Event type"] === "END_STORY")  ||  
+                                   (rawJsonData[i]["Event type"] === "STUDENT_LOGOUT") ) {
 
                                     newSheetRow["Automatic Storytelling vs Selected Storytelling "] = "Paused";   //<<<<<< correct                       
                                } else {
@@ -1964,6 +2022,8 @@
                    
                    newSheetRow["Index/ Line Word Tapped "] = '"index":' + JSON.parse(rawJsonData[i]["Message"])["index"]
 
+                   
+
                 }
 
 
@@ -2019,7 +2079,7 @@
 
                 if(jiboTalkObj != null) {
 
-                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"];
+                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"].replace(/,/g, ";");;
                 } else {
                    console.log(" No Datetime matching for Jibo state talking object")
                 }
@@ -2194,6 +2254,9 @@
       //  Main Parameters
       let jiboStateFolderPath = "jibo_state/";
       let storybookStateFolderPath = "storybook_state/";
+
+ 
+
 
       // Enable/disable ranking column for tables rows
       let enableRankFlag = false;
@@ -2466,6 +2529,20 @@
 
       let jiboStateFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
                          { type:"header", template:"Load Jibo State"},
+
+
+                         {rows: [ 
+                                  { view: "switch", label: "Remove Duplicate",  
+                                    offLabel: "Off", 
+                                    onLabel: "On", 
+                                    value: 0, 
+                                    labelWidth:130, 
+                                    id: "removeDuplicatesBtn", 
+                                    align: "left"
+                                  }
+                               ]
+                         }, 
+
                          {cols: [ 
                            {  view: "label", label: "Select File",  
                               align: "left"
@@ -2501,6 +2578,27 @@
                                                rawJiboState = convertCsv2Json(event.target.result, delimiter); 
                                                //-- rawJiboState[0] :{ Datetime: "2020-12-11-17-41-39",  in_motion: "" , audio:  "",  tts_msg: "Look at all those storybooks!", volume:   "and selecting the book you want to read", led_color: "NO DATA", lookat: NO DATA , doing_motion: True , is_playing_sound: True ,  is_listening: False }
 
+                                              if($$("removeDuplicatesBtn").getValue()) {
+                                                  // Filter duplicates
+                                                  let filteredJiboState = [];
+                                                  let seen = new Set();
+
+                                                  rawJiboState.forEach(item => {
+                                                      // Create a unique identifier based on the content of the other columns
+                                                      let identifier = `${item.in_motion}|${item.audio}|${item.tts_msg}|${item.volume}|${item.led_color}|${item.lookat}|${item.doing_motion}|${item.is_playing_sound}|${item.is_listening}`;
+
+                                                      if (!seen.has(identifier)) {
+                                                          filteredJiboState.push(item);
+                                                          seen.add(identifier);
+                                                      }
+                                                   });    
+
+                                                   rawJiboState = filteredJiboState;                                              
+
+                                              } 
+
+                                          
+
                                                webix.message({
                                                   text: file['name'] + " loaded.",
                                                   expire: 5000, // time in milliseconds after which the message will disappear
@@ -2512,6 +2610,7 @@
                                                // $$("tabview").setValue("jiboStateSampleTab");                                     
 
                                                $$("jiboStateCsvUploader").disable();
+                                               $$("removeDuplicatesBtn").disable()
 
                                                // Tabulate JSON data with Raw tab for visualization 
                                                if(enableDataSampling) {
