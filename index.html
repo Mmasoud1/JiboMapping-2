@@ -21,6 +21,10 @@
   <link rel="shortcut icon" href="#">
   <link rel="stylesheet" type="text/css" href="js/libs/webix/webix.css">
 
+    <!-- Font Awesome Library -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+
   <script src="js/libs/webix/webix.js"></script>
   <script src="https://code.jquery.com/jquery-3.3.1.js" integrity="sha256-2Kok7MbOyxpgUVvAk/HJ2jigOSYS2auK4Pfzbm7uH60=" crossorigin="anonymous"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js" type="text/javascript"></script>
@@ -93,7 +97,20 @@
   display: none;
 }
 
+/* Dropbox Access Status Styles */
+.valid-status {
+    color: green;
+    font-weight: bold;
+}
+.invalid-status {
+    color: red;
+    font-weight: bold;
+}
 
+/* Style for settings icon */
+.fa-settings {
+    font-size: 20px;
+    cursor: pointer;
 
 </style>
 
@@ -104,19 +121,208 @@
  
   <script>
 
+ 
     //*************************************** Dropbox JSON Access *******************************************//
-    
+
+    // Global variable to hold Dropbox client
+    var dbx = null;    
+
+    // Function to load settings from localStorage
+    function loadSettings() {
+        return {
+            refreshToken: localStorage.getItem('refresh_token') || '',
+            clientId: localStorage.getItem('client_id') || '',
+            clientSecret: localStorage.getItem('client_secret') || '',
+            accessToken: localStorage.getItem('access_token') || ''
+        };
+    }
+
+    // Function to save settings to localStorage
+    function saveSettings(values) {
+        localStorage.setItem('refresh_token', values.refreshToken);
+        localStorage.setItem('client_id', values.clientId);
+        localStorage.setItem('client_secret', values.clientSecret);
+        localStorage.setItem('access_token', values.accessToken);
+        webix.message("Dropbox Settings saved successfully!");
+    }
+
+    // Function to check the validity of the current access token
+    async function checkAccessTokenValidity() {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) return false;
+
+        try {
+            const response = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ path: '' })
+            });
+
+            if (response.ok) {
+                return true; // Access token is valid
+            } else {
+                // If the access token is invalid or expired, refresh it
+                const { refreshToken, clientId, clientSecret } = loadSettings();
+                const newAccessToken = await refreshAccessToken(refreshToken, clientId, clientSecret);
+                return !!newAccessToken; // Return true if a new access token is obtained
+            }
+        } catch (error) {
+            console.error('Error checking token validity:', error);
+            return false; // Access token is invalid
+        }
+    }
+
+    // Function to update the token status in the settings window
+    async function updateTokenStatus() {
+        const isValid = await checkAccessTokenValidity();
+
+        const statusColor = isValid ? "green" : "red";
+        document.getElementById("dpAccessStatus").style.backgroundColor = statusColor;
+
+        if(isValid) {
+                dbx = new Dropbox.Dropbox({ accessToken: localStorage.getItem('access_token') });
+        } 
+
+        const statusElement = $$('tokenStatus'); // Access Webix component by ID
+        if (statusElement) {
+            const statusMessage = isValid ? "Access Token is valid" : "Access Token is not valid";
+            statusElement.setHTML(`<span class='${isValid ? 'valid-status' : 'invalid-status'}'>${statusMessage}</span>`);    
+
+            if(isValid) {
+                    $$("saveDropboxSettingsBtn").disable();
+            } else {
+                    $$("saveDropboxSettingsBtn").enable();
+            }                    
+ 
+        } else {
+            console.error('Token status element is not rendered.');
+        }       
+
+    }
 
 
-    // async function getJsonData() {
-    //     try {
-    //         const json = await readJsonFile('/chicka_chicka_boom_boom/chicka_chicka_boom_boom_00.json');
-    //         return json; // You can return or use the JSON object as needed
-    //     } catch (error) {
-    //         console.error('Error fetching JSON data:', error);
-    //         return null; // Handle the error as needed
-    //     }
-    // }
+
+    // Example: Function to refresh the access token
+    async function refreshAccessToken(refreshToken, clientId, clientSecret) {
+        const url = 'https://api.dropbox.com/oauth2/token';
+        const params = new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+            client_id: clientId,
+            client_secret: clientSecret
+        });
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params
+            });
+
+            const data = await response.json();
+            if (data.access_token) {
+                localStorage.setItem('access_token', data.access_token); // Store new access token
+                updateTokenStatus(); // Update the token status after refreshing
+                return data.access_token;
+            } else {
+                console.error('Failed to refresh access token:', data);
+                webix.message({
+                    text:"Failed to refresh access token",
+                    type:"error", 
+                    expire: 10000
+                }); 
+
+                return null;
+            }
+        } catch (error) {
+            console.error('Error refreshing access token:', error);
+            webix.message({
+                text:"Error refreshing access token",
+                type:"error", 
+                expire: 10000
+            }); 
+
+            return null;
+        }
+    }
+
+    // Open Webix Dropbox access settings window
+    function openSettingsWindow() {
+        const settings = loadSettings(); // Load current settings from localStorage
+
+        // Webix Window
+        webix.ui({
+            view: "window",
+            id: "dropboxSettingsWindow",
+            width: 500,
+            height: 350,
+            position: "center",
+            modal: true,
+            head: "Dropbox API Settings",
+            body: {
+                view: "form",
+                id: "settingsForm",
+                elements: [
+                    { view: "text", label: "Access Token", name: "accessToken", value: settings.accessToken, labelWidth: 150 },
+                    { view: "text", label: "Refresh Token", name: "refreshToken", value: settings.refreshToken, labelWidth: 150 },
+                    { view: "text", label: "Client ID", name: "clientId", value: settings.clientId, labelWidth: 150 },
+                    { view: "text", label: "Client Secret", name: "clientSecret", value: settings.clientSecret, labelWidth: 150, type: "password" },
+                    {
+                        margin: 5,
+                        cols: [
+                            { view: "label", label: "Access Status", width: 150 },
+                            { view: "template", id: "tokenStatus", template: "<span>Checking token status...</span>", labelWidth: 150, borderless: true }
+                        ]
+                    },
+                    {
+                        margin: 5,
+                        cols: [
+                            { view: "button", id: "saveDropboxSettingsBtn" , value: "Save", css: "webix_primary", click: function() {
+                                const values = $$("settingsForm").getValues();
+                                saveSettings(values); // Save settings to localStorage
+                                updateTokenStatus(); // Check the token status after saving
+                            }},
+                            { view: "button", value: "Close", click: function() {
+                                $$("dropboxSettingsWindow").close(); // Close the settings window
+                            }}
+                        ]
+                    }
+                ]
+            }
+        }).show();
+
+        // Update the token status when the window is shown
+        updateTokenStatus();
+    }
+
+    // Webix form for Dropbox Access Status
+    let dropboxAccessStatus = {
+        view: "form",
+        css: { "border-radius": "20px" },
+        id: "dropboxAccessStatusId",
+        elements: [
+            {
+                cols: [
+                    { view: "label", label: "Dropbox Access", width: 120, align: "left" },
+                    {
+                        view: "label",
+                        label: "<span id='dpAccessStatus' style='background-color:none; padding-left:0.5vw;'>&nbsp&nbsp</span>",
+                        align: "center",
+                        on: {
+                            onAfterRender: function() {
+                                updateTokenStatus(); // Check the token status when the form is rendered
+                            }
+                        }
+                    }
+                ]
+            }
+        ]
+    };
+
+
 
 
     async function readJsonFile(fileName) {
@@ -143,16 +349,41 @@
                 reader.readAsText(blob);
             });
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error reading JSON file:', error);
+            if (error.status === 401) { // If the token has expired
+                const { refreshToken, clientId, clientSecret } = loadSettings();
+                const newAccessToken = await refreshAccessToken(refreshToken, clientId, clientSecret);
+
+                if (newAccessToken) {
+                    webix.message({
+                        text:"Retry read JSON with the new token",
+                        expire: 10000
+                    });  
+
+                    return readJsonFile(fileName); // Retry with the new token
+                }
+            }
             throw error; // Re-throw the error to be handled by the caller
         }
     }
+    
 
+    // async function getJsonData() {
+    //     try {
+    //         const json = await readJsonFile('/chicka_chicka_boom_boom/chicka_chicka_boom_boom_00.json');
+    //         return json; // You can return or use the JSON object as needed
+    //     } catch (error) {
+    //         console.error('Error fetching JSON data:', error);
+    //         return null; // Handle the error as needed
+    //     }
+    // }
 
 
     // readJsonFile('/chicka_chicka_boom_boom/chicka_chicka_boom_boom_00.json').then(json => {
     //    console.log(json);
     // });
+
+    //--  var dbx = new Dropbox.Dropbox({ accessToken: ACCESS_TOKEN }); 
 
     //******************************************************************************************************//   
 
@@ -2304,6 +2535,12 @@
         id: "myToolbar",
         rows:[{ cols: [
           { view: "label", label: "JIBO&nbsp;MAPPING", css: {"margin":"0!important"},  inputWidth: 100, align: "left" }, 
+          { template: "<i class='fas fa-cog fa-settings'></i>", borderless: true, width: 40, onClick: {
+            "fa-cog": function() {
+                openSettingsWindow();  // Open the settings window on click
+             }
+          }},
+
           { view: "button", id: "About", value: "About", width: 100, align: "right", click: aboutClick }
         ]}
        ]
@@ -2828,7 +3065,7 @@
           margin:20,
           padding: 20,
           cols: [{width: 250, rows:[
-          rawCsvFile, storybookStateFile, jiboStateFile, convertCsv  , downloadCsvFile, {}]},
+          rawCsvFile, storybookStateFile, jiboStateFile, convertCsv  , downloadCsvFile, dropboxAccessStatus, {}]},
           { rows: [  tabViewer, { gravity: 2,content: ""}]}]
         }]
         });
