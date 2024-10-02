@@ -505,7 +505,39 @@
         }));
 
         const combinedData = [...eventData, ...processedCommandData];
-        combinedData.sort((a, b) => ( parseDatetime(a.Datetime) >= parseDatetime(b.Datetime) ? 1 : -1 ) );
+
+        // combinedData.sort((a, b) => ( parseDatetime(a.Datetime) >= parseDatetime(b.Datetime) ? 1 : -1 ) );
+
+
+        combinedData.sort((a, b) => {
+            // First, sort by Datetime
+            const dateComparison = parseDatetime(a.Datetime) - parseDatetime(b.Datetime);
+            
+            if (dateComparison !== 0) {
+                return dateComparison;
+            }
+
+            // // If Datetime is the same, sort based on Event type
+            // if (a["Event type"] === "HELLO_WORLD" && b["Event type"] !== "HELLO_WORLD") {
+            //     return -1; // a comes first
+            // }
+            // if (b["Event type"] === "HELLO_WORLD" && a["Event type"] !== "HELLO_WORLD") {
+            //     return 1; // b comes first
+            // }
+
+            // If Datetime is the same, prioritize "HELLO_WORLD" and "HELLO WORLD MSG"
+            if ((a["Event type"] === "HELLO_WORLD" || a["Event type"] === "HELLO WORLD MSG") &&
+                (b["Event type"] !== "HELLO_WORLD" && b["Event type"] !== "HELLO WORLD MSG")) {
+                return -1; // a comes first
+            }
+            if ((b["Event type"] === "HELLO_WORLD" || b["Event type"] === "HELLO WORLD MSG") &&
+                (a["Event type"] !== "HELLO_WORLD" && a["Event type"] !== "HELLO WORLD MSG")) {
+                return 1; // b comes first
+            }            
+
+            // Otherwise, keep the original order
+            return 0;
+        });        
 
         return combinedData;
 
@@ -1557,9 +1589,9 @@
 
                 if(jiboTalkObj != null) {
 
-                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"].replace(/,/g, ";");;
+                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"].replace(/,/g, ";");
                 } else {
-                   console.log(" No Datetime matching for Jibo state talking object")
+                   console.log(" No Datetime matching for Jibo state talking object");
                 }
 
                    
@@ -2032,9 +2064,19 @@
 
                 } else {
 
-                      if(i != 0 ) {
-                         newSheetRow["Participant"] = newCleanDataSheet[i - 1]["Participant"]; 
-                      }
+                        if (i > 0 && i - 1 < newCleanDataSheet.length && newCleanDataSheet[i - 1] !== undefined) {
+                            newSheetRow["Participant"] = newCleanDataSheet[i - 1]["Participant"];
+                        }
+                            // try {
+                            //     if (Array.isArray(newCleanDataSheet) && i > 0 && i - 1 < newCleanDataSheet.length) {
+                            //         const previousParticipant = newCleanDataSheet[i - 1];
+                            //         if (previousParticipant !== undefined && previousParticipant.Participant !== undefined) {
+                            //             newSheetRow["Participant"] = previousParticipant["Participant"];
+                            //         }
+                            //     }
+                            // } catch (error) {
+                            //     console.error(`Error at i = ${i}:`, error);
+                            // }
                 }
 
 
@@ -2096,16 +2138,18 @@
 
                    } else {
 
-                       // TUTORIAL MODE
-                       if( newCleanDataSheet[i - 1]["Storybook Selected"] === "TUTORIAL" ) {
+                        if (i > 0 && i - 1 < newCleanDataSheet.length && newCleanDataSheet[i - 1] !== undefined) {
+                           // TUTORIAL MODE
+                           if( newCleanDataSheet[i - 1]["Storybook Selected"] === "TUTORIAL" ) {
 
-                               newSheetRow["Storybook Selected"] = "TUTORIAL";
+                                   newSheetRow["Storybook Selected"] = "TUTORIAL";
 
-                       } else { // STORY MODE
+                           } else { // STORY MODE
 
-                               newSheetRow["Storybook Selected"] = newCleanDataSheet[i - 1]["Storybook Selected"]
+                                   newSheetRow["Storybook Selected"] = newCleanDataSheet[i - 1]["Storybook Selected"]
 
-                       }
+                           }
+                        }   
                    }                    
                 }
 
@@ -2141,7 +2185,7 @@
                    } else {
 
                        // TUTORIAL MODE
-                       if( newCleanDataSheet[i - 1]["Storybook Selected"] === "TUTORIAL" ) {
+                       if( newCleanDataSheet[i - 1] !== undefined && newCleanDataSheet[i - 1]["Storybook Selected"] === "TUTORIAL" ) {
 
                                newSheetRow["Total Page Number"] = 0;  
                                newSheetRow["Page Number"] = 0;  
@@ -2201,9 +2245,9 @@
                                       
                 // Check when Automatic  Storytelling  change to paused and stopped, and vice versa                    
                 //-- if(newSheetRow["Automatic Storytelling vs Selected Storytelling "] !== "") {
-                if(newCleanDataSheet.length > 1) {
+                if(newCleanDataSheet.length > 1 ) {
 
-                   let prevState = newCleanDataSheet[i - 1]["Automatic Storytelling vs Selected Storytelling "];
+                   let prevState = newCleanDataSheet[i - 1] !== undefined ? newCleanDataSheet[i - 1]["Automatic Storytelling vs Selected Storytelling "] : "";
                    let currentState = newSheetRow["Automatic Storytelling vs Selected Storytelling "];
 
                    if(prevState === "") {
@@ -2241,7 +2285,7 @@
 
                 if(newCleanDataSheet.length > 1) {
 
-                   let prevState =newCleanDataSheet[i - 1]["Automatic Storytelling vs Selected Storytelling "];
+                   let prevState = newCleanDataSheet[i - 1] !== undefined ? newCleanDataSheet[i - 1]["Automatic Storytelling vs Selected Storytelling "] : "";
                    let currentState = newSheetRow["Automatic Storytelling vs Selected Storytelling "];
                    
                    if( ( currentState !== prevState ) && (prevState !== "" ) ) {
@@ -2338,6 +2382,7 @@
                 if(rawJsonData[i]["Event type"] != null && rawJsonData[i]["Event type"] === "HIGHLIGHT_WORD"  ) { 
                    
                    newSheetRow["Index/ Line Word Tapped "] = '"indexes":' + JSON.parse(rawJsonData[i]["Message"])["indexes"]
+                   newSheetRow["Index/ Line Word Tapped "] = newSheetRow["Index/ Line Word Tapped "].replace(/,/g, ";");
 
                 }
 
@@ -2437,7 +2482,7 @@
 
                 if(jiboTalkObj != null) {
 
-                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"].replace(/,/g, ";");;
+                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"].replace(/,/g, ";");
                 } else {
                    console.log(" No Datetime matching for Jibo state talking object")
                 }
@@ -2596,7 +2641,38 @@
          //-- newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
 
 
+        // List of fields to check for empty values
+        const fieldsToCheck = [
+          "Time Stopes", "Time Reading ", "Paused", 
+          "Total Time Reading", "Total Time Paused", "Total Time in Storybook",  
+          "Tutorial Response", "Tutorial Command", "NEXT_PAGE Tapped ", 
+          "Index/ Line Word Tapped ", "Word Tapped ", "Scene Object Tapped", 
+          "Jibo buttom pressed", "Jibo Asked Question", "Jibo Command",  
+          "Transcription or word/ image tapped ", "No Response to Jibo",  
+          "Confidence level ", "Return to library Early", "Finished Storybook",
+          "Student Logout"
+        ];
+
+        // Filter out objects where any of the specified fields are empty
+        const filteredData = newCleanDataSheet.filter(item => {
+          // Check if all the specified fields have non-empty values
+         
+          return fieldsToCheck.some(field => item[field] !== "" && item[field] !== null);
+        });      
+
+
+        console.log(" filteredData :", filteredData)   
+
+
         $$("fileNameToDL").setValue( currentParticipant + "_" + newCleanDataSheet[0]["Datetime"] + ".csv"); 
+
+        if(true) { // if removing empty rows with fields of check is true..
+
+            return  filteredData;
+
+        }    
+
+        console.log(" newCleanDataSheet :", newCleanDataSheet)
 
         return  newCleanDataSheet;
 
