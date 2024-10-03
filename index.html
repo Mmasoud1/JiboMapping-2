@@ -1990,6 +1990,9 @@
 
             }
 
+           // Filter out empty arrays  e.g. []
+           storyNames = storyNames.filter(item => !(Array.isArray(item) && item.length === 0));
+
            session.stories.push({storyName: storyNames, storyLoadSession: storyLoadSessions });
 
         });
@@ -2129,7 +2132,8 @@
                 } else { // Other then HELLO_WORLD
 
                    // STORY LOADED -- STORY NAME SHOULD APPEAR WITH "Storybook Selected."
-                   if (rawJsonData[i]["Event type"] === "STORY_LOADED" || rawJsonData[i]["Event type"] === "STORY_SELECTED") {
+                   //-- if (rawJsonData[i]["Event type"] === "STORY_LOADED" || rawJsonData[i]["Event type"] === "STORY_SELECTED") {
+                   if ( rawJsonData[i]["Event type"] === "STORY_SELECTED") {                    
 
                            newSheetRow["Storybook Selected"] = session.stories[0].storyName[currentStoryIdx];
 
@@ -2661,18 +2665,18 @@
         });      
 
 
-        console.log(" filteredData :", filteredData)   
+        // console.log(" filteredData :", filteredData)   
 
 
         $$("fileNameToDL").setValue( currentParticipant + "_" + newCleanDataSheet[0]["Datetime"] + ".csv"); 
 
-        if(true) { // if removing empty rows with fields of check is true..
+        if($$("removeEmptyRowBtn").getValue()) { // if removing empty rows with fields of check is true..
 
             return  filteredData;
 
         }    
 
-        console.log(" newCleanDataSheet :", newCleanDataSheet)
+        // console.log(" newCleanDataSheet :", newCleanDataSheet)
 
         return  newCleanDataSheet;
 
@@ -3086,12 +3090,23 @@
       let convertCsv = {view: "form", css: {"border-radius": "20px"},  elements: [ 
                          { type:"header", template:"Convert CSV"},
                          {rows: [ 
+            
+                            { 
+                              view: "switch", label: "Remove Empty Rows",  
+                              offLabel: "Off", 
+                              onLabel: "On", 
+                              value: 1, 
+                              labelWidth:150, 
+                              id: "removeEmptyRowBtn", 
+                              align: "left"
+                            },
+
                           
                             { view: "switch", label: "Convert",  
                               offLabel: "Off", 
                               onLabel: "On", 
                               value: 0, 
-                              labelWidth:130, 
+                              labelWidth:150, 
                               id: "convertBtn", 
                               align: "left",
 
@@ -3292,6 +3307,7 @@
                  $$("rawCsvUploader").enable();
                  $$("storyStateCsvUploader").enable();
                  $$("jiboStateCsvUploader").enable();
+                 $$("removeEmptyRowBtn").disable();
                  setInterval(function(){  }, 4000); 
                  setTimeout(function(){ $$("convertBtn").disable(); $$("convertBtn").setValue(0)}, swTimeOut);                  
        
