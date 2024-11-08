@@ -387,17 +387,25 @@
 
 
 
+    // function getPageString(pageNumber) {
+    //     if (pageNumber > 0 && pageNumber < 10) {
+    //         return '0' + (pageNumber - 1).toString();
+    //     } else if (pageNumber >= 10) {
+    //         return (pageNumber - 1).toString();
+    //     } else {
+    //         return null; // Handle invalid page numbers if needed
+    //     }
+    // }    
+
     function getPageString(pageNumber) {
         if (pageNumber > 0 && pageNumber < 10) {
-            return '0' + (pageNumber - 1).toString();
+            return '0' + (pageNumber).toString();
         } else if (pageNumber >= 10) {
-            return (pageNumber - 1).toString();
+            return (pageNumber).toString();
         } else {
             return null; // Handle invalid page numbers if needed
         }
     }    
-
-
 
 
 
@@ -1769,7 +1777,7 @@
     *
     */  
 
-   jiboMapping3col = (rawJsonData, rawStoryBookState, rawJiboState) => {
+    jiboMapping3col = (rawJsonData, rawStoryBookState, rawJiboState) => {
 
       console.log("jiboMapping3col called ......... ")
       
@@ -2382,8 +2390,8 @@
 
                 }
 
-
-                if(rawJsonData[i]["Event type"] != null && rawJsonData[i]["Event type"] === "HIGHLIGHT_WORD"  ) { 
+                // Disable this for now by set false   //////// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                if(false && rawJsonData[i]["Event type"] != null && rawJsonData[i]["Event type"] === "HIGHLIGHT_WORD"  ) { 
                    
                    newSheetRow["Index/ Line Word Tapped "] = '"indexes":' + JSON.parse(rawJsonData[i]["Message"])["indexes"]
                    newSheetRow["Index/ Line Word Tapped "] = newSheetRow["Index/ Line Word Tapped "].replace(/,/g, ";");
@@ -2394,58 +2402,64 @@
                 //------ Word Tapped  Column ------//
                 /////////////////////////////////////
 
-                if(rawJsonData[i]["Message"] != null && rawJsonData[i]["Message"].includes("word:") ) { 
-                   
-                   newSheetRow["Word Tapped "] = JSON.parse(rawJsonData[i]["Message"])["word"];
-
-                }
-
-
-                // Get the tapped word from dropbox Json file e.g.  
-                if( rawJsonData[i]["Event type"] === "WORD_TAPPED" && rawJsonData[i]["Message"].includes('"index"') ) { 
-
-                    //-- if( allStoryNames.includes( newSheetRow["Storybook Selected"] ) ) {}
-
-                    if(parseInt(newSheetRow["Page Number"]) > 0 ) { 
-
-                       let pageString = getPageString( parseInt(newSheetRow["Page Number"]) );
-                       // e.g. '00'
-
-
-                       let jsonObj = null;
-
-                       let jsonFilePath =  '/' + newSheetRow["Storybook Selected"] + '/' + newSheetRow["Storybook Selected"] + '_' + pageString + '.json';
-                       // //-- e.g. '/chicka_chicka_boom_boom/chicka_chicka_boom_boom_00.json'                       
+                
+                if( ( rawJsonData[i]["Event type"] === "WORD_TAPPED" ) && ( rawJsonData[i]["Message"] != null) ) {
+                    
+                    if( rawJsonData[i]["Message"].includes("word") ) { 
                        
-                        jsonObj = getJsonData(jsonFilePath); 
+                       newSheetRow["Word Tapped "] = JSON.parse(rawJsonData[i]["Message"])["word"];
+                       console.log(" word found :", newSheetRow["Word Tapped "] )
 
-                        if(jsonObj == null) {
-                            console.log("jsonObj is null for this path :", jsonFilePath);
+                    } else if( rawJsonData[i]["Message"].includes('"index"') && !rawJsonData[i]["Message"].includes('"indexes"')) { 
+                        // Get the tapped word from dropbox Json file e.g. 
 
-                        } else {
+                        //-- if( allStoryNames.includes( newSheetRow["Storybook Selected"] ) ) {}
 
-                            let indexRef = JSON.parse(rawJsonData[i]["Message"])["index"];
-                            // e.g.  indexRef  "0-12"  or "2-22"
+                        if(parseInt(newSheetRow["Page Number"]) > 0 ) { 
 
-                            try {
+                           let pageString = getPageString( parseInt(newSheetRow["Page Number"]) );
+                           // e.g. '01'
 
-                                // Find the object with the matching index
-                                let foundObject = jsonObj["timestamps"].find(obj => obj.index === indexRef);
 
-                                // Check if the object is found and retrieve the associated word
-                                if (foundObject) {
-                                  newSheetRow["Word Tapped "] =   foundObject.word;
-                                  
-                                } else {
-                                  console.log(`No object found with index "${indexRef}" with "${jsonFilePath}"`);
-                                } 
-                            } catch(error) {
-                                console.log(`Error for object found with index "${indexRef}" and "${jsonFilePath}"`);
-                                console.error('Error:', error);
+                           let jsonObj = null;
 
-                            }
+                           let jsonFilePath =  '/' + newSheetRow["Storybook Selected"] + '/' + newSheetRow["Storybook Selected"] + '_' + pageString + '.json';
+                           // //-- e.g. '/chicka_chicka_boom_boom/chicka_chicka_boom_boom_01.json'      
 
-                        }                                                 
+                            jsonObj =  getJsonData(jsonFilePath); 
+                            console.log("jsonObj : ", jsonObj)
+                           
+
+                            if(jsonObj == null) {
+                                console.log("jsonObj is null for this path :", jsonFilePath);
+
+                            } else {
+
+                                let indexRef = JSON.parse(rawJsonData[i]["Message"])["index"];
+                                // e.g.  indexRef  "0-12"  or "2-22"
+
+                                try {
+
+                                    // Find the object with the matching index
+                                    let foundObject = jsonObj["timestamps"].find(obj => obj.index === indexRef);
+
+                                    // Check if the object is found and retrieve the associated word
+                                    if (foundObject) {
+                                      newSheetRow["Word Tapped "] =   foundObject.word;
+                                      console.log(" word found by JSON :", newSheetRow["Word Tapped "] )
+                                      
+                                    } else {
+                                      console.log(`No object found with index "${indexRef}" with "${jsonFilePath}"`);
+                                    } 
+                                } catch(error) {
+                                    console.log(`Error for object found with index "${indexRef}" and "${jsonFilePath}"`);
+                                    console.error('Error:', error);
+
+                                }
+
+                            }                                                 
+
+                        }
 
                     }
 
