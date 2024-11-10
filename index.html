@@ -368,6 +368,19 @@
     }
     
 
+    // function getJsonData(jsonFilePath) {
+    //     try {
+    //         // Return the promise directly from readJsonFile
+    //         return readJsonFile(jsonFilePath).then(jsonObj => {
+    //             console.log("test jsonObj: ", jsonObj);
+    //             return jsonObj; // This value will be returned when the Promise resolves
+    //         });
+    //     } catch (error) {
+    //         console.error('Error fetching JSON data:', error);
+    //         return Promise.resolve(null); // Return a resolved Promise with null to keep consistency
+    //     }
+    // }     
+
     async function getJsonData(jsonFilePath) {
         try {
             const jsonObj = await readJsonFile(jsonFilePath);
@@ -900,7 +913,7 @@
     *
     */  
 
-   jiboMapping = (rawJsonData, rawStoryBookState, rawJiboState) => {
+    async function jiboMapping(rawJsonData, rawStoryBookState, rawJiboState) {
 
       console.log("jiboMapping called ......... ")
 
@@ -1152,8 +1165,14 @@
 
         let currentParticipant = "";
 
+        // For progress bar end calculation
+        const totalRows =  helloWorldSessions[helloWorldSessions.length-1].end; 
+        let showProgressBarFlag = true;
+        let hideProgressBarFlag = false;           
 
-        helloWorldSessions.forEach((session, idx) => { // idx starts with 0
+
+        // helloWorldSessions.forEach((session, idx) => { // idx starts with 0
+        for (const session of helloWorldSessions) {        
 
             let currentStoryIdx = 0;
             let pageNumber = 1;
@@ -1490,8 +1509,10 @@
                 //-Index/ Line Word Tapped Column -//
                 /////////////////////////////////////
 
-                if(rawJsonData[i]["Event type"] != null && (rawJsonData[i]["Event type"] === "WORD_TAPPED" || 
-                   rawJsonData[i]["Event type"] === "HIGHLIGHT_WORD" ) ) { 
+                // if(rawJsonData[i]["Event type"] != null && (rawJsonData[i]["Event type"] === "WORD_TAPPED" || 
+                //    rawJsonData[i]["Event type"] === "HIGHLIGHT_WORD" ) ) { 
+
+                if(rawJsonData[i]["Event type"] != null && (rawJsonData[i]["Event type"] === "WORD_TAPPED" ) ) {                     
                    
                    newSheetRow["Index/ Line Word Tapped "] = rawJsonData[i]["Message"];
 
@@ -1502,60 +1523,138 @@
                 //------ Word Tapped  Column ------//
                 /////////////////////////////////////
 
-                if(rawJsonData[i]["_1"] != null && rawJsonData[i]["_1"].includes("word:") ) { 
+                // if(rawJsonData[i]["_1"] != null && rawJsonData[i]["_1"].includes("word:") ) { 
                    
-                   newSheetRow["Word Tapped "] = rawJsonData[i]["_1"];
+                //    newSheetRow["Word Tapped "] = rawJsonData[i]["_1"];
 
-                }
+                // }
 
-                // Get the tapped word from dropbox Json file e.g.  
-                if( rawJsonData[i]["Event type"] === "WORD_TAPPED" && rawJsonData[i]["Message"].includes('"index"') ) { 
+                // // Get the tapped word from dropbox Json file e.g.  
+                // if( rawJsonData[i]["Event type"] === "WORD_TAPPED" && rawJsonData[i]["Message"].includes('"index"') ) { 
 
-                    // if( allStoryNames.includes( newSheetRow["Storybook Selected"] ) ) {}
+                //     // if( allStoryNames.includes( newSheetRow["Storybook Selected"] ) ) {}
 
-                    if(parseInt(newSheetRow["Page Number"]) > 0 ) { 
+                //     if(parseInt(newSheetRow["Page Number"]) > 0 ) { 
 
-                       let pageString = getPageString( parseInt(newSheetRow["Page Number"]) );
-                       // e.g. '00'
-
-
-                       let jsonObj = null;
-
-                       let jsonFilePath =  '/' + newSheetRow["Storybook Selected"] + '/' + newSheetRow["Storybook Selected"] + '_' + pageString + '.json';
-                       // //-- e.g. '/chicka_chicka_boom_boom/chicka_chicka_boom_boom_00.json'
+                //        let pageString = getPageString( parseInt(newSheetRow["Page Number"]) );
+                //        // e.g. '00'
 
 
-                        //-- readJsonFile(jsonFilePath).then(jsonResult => {
-                        //--    jsonObj = jsonResult;
-                        //-- });  
+                //        let jsonObj = null;
 
-                        jsonObj = getJsonData(jsonFilePath);                          
+                //        let jsonFilePath =  '/' + newSheetRow["Storybook Selected"] + '/' + newSheetRow["Storybook Selected"] + '_' + pageString + '.json';
+                //        // //-- e.g. '/chicka_chicka_boom_boom/chicka_chicka_boom_boom_00.json'
 
-                        if(jsonObj == null) {
-                            console.log("jsonObj is null for this path :", jsonFilePath);
 
-                        } else {
+                //         //-- readJsonFile(jsonFilePath).then(jsonResult => {
+                //         //--    jsonObj = jsonResult;
+                //         //-- });  
 
-                            let indexRef = extractIndexValue(rawJsonData[i]["Message"]);
-                            // e.g.  indexRef  "0-12"  or "2-22"
+                //         jsonObj =  getJsonData(jsonFilePath);                          
 
-                            try {
+                //         if(jsonObj == null) {
+                //             console.log("jsonObj is null for this path :", jsonFilePath);
 
-                                // Find the object with the matching index
-                                let foundObject = jsonObj["timestamps"].find(obj => obj.index === indexRef);
+                //         } else {
 
-                                // Check if the object is found and retrieve the associated word
-                                if (foundObject) {
-                                  newSheetRow["Word Tapped "] =   foundObject.word;
+                //             let indexRef = extractIndexValue(rawJsonData[i]["Message"]);
+                //             // e.g.  indexRef  "0-12"  or "2-22"
+
+                //             try {
+
+                //                 // Find the object with the matching index
+                //                 let foundObject = jsonObj["timestamps"].find(obj => obj.index === indexRef);
+
+                //                 // Check if the object is found and retrieve the associated word
+                //                 if (foundObject) {
+                //                   newSheetRow["Word Tapped "] =   foundObject.word;
                                   
-                                } else {
-                                  console.log(`No object found with index "${indexRef}" with "${jsonFilePath}"`);
-                                } 
-                            } catch(error) {
-                                console.log(`Error for object found with index "${indexRef}" and "${jsonFilePath}"`);
-                                console.error('Error:', error);
+                //                 } else {
+                //                   console.log(`No object found with index "${indexRef}" with "${jsonFilePath}"`);
+                //                 } 
+                //             } catch(error) {
+                //                 console.log(`Error for object found with index "${indexRef}" and "${jsonFilePath}"`);
+                //                 console.error('Error:', error);
 
-                            }
+                //             }
+
+                //         }
+
+                //     }
+
+                // }
+
+
+                if( ( rawJsonData[i]["Event type"] === "WORD_TAPPED" ) && ( rawJsonData[i]["_1"] != null) ) {
+                    
+                    if( rawJsonData[i]["_1"].includes("word") ) { 
+                       
+                       newSheetRow["Word Tapped "] = rawJsonData[i]["_1"];
+                       console.log(" word found :", newSheetRow["Word Tapped "] )
+
+                    } else if( rawJsonData[i]["Message"].includes('"index"') && !rawJsonData[i]["Message"].includes('"indexes"')) { 
+                        // Get the tapped word from dropbox Json file e.g. 
+
+                        if(showProgressBarFlag) {
+                            $$("progressWindow").show();
+                            showProgressBarFlag = false;
+                            hideProgressBarFlag = true;
+                        }
+
+                        //-- if( allStoryNames.includes( newSheetRow["Storybook Selected"] ) ) {}
+
+                        if(parseInt(newSheetRow["Page Number"]) > 0 ) { 
+
+                           let pageString = getPageString( parseInt(newSheetRow["Page Number"]) );
+                           // e.g. '01'
+
+
+                           // let jsonObj = null;
+
+                           let jsonFilePath =  '/' + newSheetRow["Storybook Selected"] + '/' + newSheetRow["Storybook Selected"] + '_' + pageString + '.json';
+                           // //-- e.g. '/chicka_chicka_boom_boom/chicka_chicka_boom_boom_01.json'
+                    
+
+                            // (async () => {
+                            //     console.log("jsonFilePath:", jsonFilePath);
+                            //     jsonObj = await getJsonData(jsonFilePath); 
+                            //     console.log("jsonObj:", jsonObj);
+                            // })();
+
+                            const jsonObj = await readJsonFile(jsonFilePath);
+                            console.log("jsonObj:", jsonObj);
+
+                            document.getElementById("progressBar").style.width = (i / totalRows) * 100 + "%";
+                              
+  
+                            if(jsonObj == null) {
+                                console.log("jsonObj is null for this path :", jsonFilePath);
+
+                            } else {
+
+                                let indexRef = extractIndexValue(rawJsonData[i]["Message"]);
+                                // e.g.  indexRef  "0-12"  or "2-22"
+
+                                try {
+
+                                    // Find the object with the matching index
+                                    let foundObject = jsonObj["timestamps"].find(obj => obj.index === indexRef);
+
+                                    // Check if the object is found and retrieve the associated word
+                                    if (foundObject) {
+                                      newSheetRow["Word Tapped "] =   foundObject.word;
+                                      console.log(" word found by JSON :", newSheetRow["Word Tapped "] )
+                                      
+                                    } else {
+                                      console.log(`No object found with index "${indexRef}" with "${jsonFilePath}"`);
+                                    } 
+                                } catch(error) {
+                                    console.log(`Error for object found with index "${indexRef}" and "${jsonFilePath}"`);
+                                    console.error('Error:', error);
+
+                                }
+
+                            }                                                 
 
                         }
 
@@ -1567,7 +1666,7 @@
                 //--- Scene Object Tapped Column---//
                 /////////////////////////////////////
 
-                if(rawJsonData[i]["_1"] != null && rawJsonData[i]["_1"].includes("label:") ) { 
+                if(rawJsonData[i]["_1"] != null && rawJsonData[i]["_1"].includes("label") ) { 
                    
                    newSheetRow["Scene Object Tapped"] = rawJsonData[i]["_1"];
 
@@ -1711,8 +1810,12 @@
             }
             
 
-         });
+        };
 
+
+        if(hideProgressBarFlag) {
+           $$("progressWindow").hide();
+        }
 
          //// Remove first duplicates from newCleanDataSheet 
          // newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
@@ -1777,7 +1880,9 @@
     *
     */  
 
-    jiboMapping3col = (rawJsonData, rawStoryBookState, rawJiboState) => {
+    // jiboMapping3col = (rawJsonData, rawStoryBookState, rawJiboState) => {
+    async function jiboMapping3col(rawJsonData, rawStoryBookState, rawJiboState) {
+    
 
       console.log("jiboMapping3col called ......... ")
       
@@ -2032,12 +2137,20 @@
         let currentParticipant = "";
 
 
-        helloWorldSessions.forEach((session, idx) => { // idx starts with 0
+        // For progress bar end calculation
+        const totalRows =  helloWorldSessions[helloWorldSessions.length-1].end; 
+        let showProgressBarFlag = true;
+        let hideProgressBarFlag = false;        
+
+
+        // helloWorldSessions.forEach((session, idx) => { // idx starts with 0
+        for (const session of helloWorldSessions) {    
 
             let currentStoryIdx = 0;
             let pageNumber = 1;
             let lineNumber = 1;  
-      
+
+
 
             console.log("session.start :", session.start);
             console.log("session.end :", session.end);
@@ -2391,12 +2504,12 @@
                 }
 
                 // Disable this for now by set false   //////// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                if(false && rawJsonData[i]["Event type"] != null && rawJsonData[i]["Event type"] === "HIGHLIGHT_WORD"  ) { 
+                // if(false && rawJsonData[i]["Event type"] != null && rawJsonData[i]["Event type"] === "HIGHLIGHT_WORD"  ) { 
                    
-                   newSheetRow["Index/ Line Word Tapped "] = '"indexes":' + JSON.parse(rawJsonData[i]["Message"])["indexes"]
-                   newSheetRow["Index/ Line Word Tapped "] = newSheetRow["Index/ Line Word Tapped "].replace(/,/g, ";");
+                //    newSheetRow["Index/ Line Word Tapped "] = '"indexes":' + JSON.parse(rawJsonData[i]["Message"])["indexes"]
+                //    newSheetRow["Index/ Line Word Tapped "] = newSheetRow["Index/ Line Word Tapped "].replace(/,/g, ";");
 
-                }
+                // }
 
                 /////////////////////////////////////
                 //------ Word Tapped  Column ------//
@@ -2413,6 +2526,12 @@
                     } else if( rawJsonData[i]["Message"].includes('"index"') && !rawJsonData[i]["Message"].includes('"indexes"')) { 
                         // Get the tapped word from dropbox Json file e.g. 
 
+                        if(showProgressBarFlag) {
+                            $$("progressWindow").show();
+                            showProgressBarFlag = false;
+                            hideProgressBarFlag = true;
+                        }
+
                         //-- if( allStoryNames.includes( newSheetRow["Storybook Selected"] ) ) {}
 
                         if(parseInt(newSheetRow["Page Number"]) > 0 ) { 
@@ -2421,15 +2540,24 @@
                            // e.g. '01'
 
 
-                           let jsonObj = null;
+                           // let jsonObj = null;
 
                            let jsonFilePath =  '/' + newSheetRow["Storybook Selected"] + '/' + newSheetRow["Storybook Selected"] + '_' + pageString + '.json';
-                           // //-- e.g. '/chicka_chicka_boom_boom/chicka_chicka_boom_boom_01.json'      
+                           // //-- e.g. '/chicka_chicka_boom_boom/chicka_chicka_boom_boom_01.json'
+                    
 
-                            jsonObj =  getJsonData(jsonFilePath); 
-                            console.log("jsonObj : ", jsonObj)
-                           
+                            // (async () => {
+                            //     console.log("jsonFilePath:", jsonFilePath);
+                            //     jsonObj = await getJsonData(jsonFilePath); 
+                            //     console.log("jsonObj:", jsonObj);
+                            // })();
 
+                            const jsonObj = await readJsonFile(jsonFilePath);
+                            console.log("jsonObj:", jsonObj);
+
+                            document.getElementById("progressBar").style.width = (i / totalRows) * 100 + "%";
+                              
+  
                             if(jsonObj == null) {
                                 console.log("jsonObj is null for this path :", jsonFilePath);
 
@@ -2470,9 +2598,14 @@
                 //--- Scene Object Tapped Column---//
                 /////////////////////////////////////
 
-                if(rawJsonData[i]["Message"] != null && rawJsonData[i]["Message"].includes("label:") ) { 
-                   
-                   newSheetRow["Scene Object Tapped"] = JSON.parse(rawJsonData[i]["Message"])["label"];
+                if(rawJsonData[i]["Message"] != null && rawJsonData[i]["Message"].includes("label") ) { 
+
+                    if(rawJsonData[i]["Message"].includes("labels")) {
+                        newSheetRow["Scene Object Tapped"] = JSON.parse(rawJsonData[i]["Message"])["labels"];
+
+                    } else  {
+                        newSheetRow["Scene Object Tapped"] = JSON.parse(rawJsonData[i]["Message"])["label"];
+                    }
 
                 }
 
@@ -2614,7 +2747,11 @@
             }
             
 
-         });
+        }
+
+        if(hideProgressBarFlag) {
+           $$("progressWindow").hide();
+        }
 
 
          //// Remove first duplicates from newCleanDataSheet 
@@ -3125,17 +3262,17 @@
                               align: "left",
 
                               on:{        
-                               onChange: function(newValue, oldValue, config) {   
+                               onChange: async function(newValue, oldValue, config) {   
 
                                     if(newValue) {
 
                                          if(Object.keys(rawJsonData[0]).length == 3) {
                                              //-- 3 col : "Datetime" "Event type" "Message"
-                                            newCleanCSVSheet = jiboMapping3col(rawJsonData, rawStoryBookState, rawJiboState);
+                                            newCleanCSVSheet = await jiboMapping3col(rawJsonData, rawStoryBookState, rawJiboState);
 
                                          } else {
                                             //-- More then 3 col : "Datetime" "Event type" "Message", "_1" "_2" "_3" etc
-                                            newCleanCSVSheet = jiboMapping(rawJsonData, rawStoryBookState, rawJiboState);
+                                            newCleanCSVSheet = await jiboMapping(rawJsonData, rawStoryBookState, rawJiboState);
 
                                          } 
 
@@ -3288,6 +3425,27 @@
         ]
    
       };
+
+      ////////////////////// Progress bar for JSON reading ////      
+        webix.ui({
+            view: "window",
+            id: "progressWindow",
+            width: 300,
+            height: 100,
+            move: true, // Make the window draggable
+            position: function(state) {
+                state.top = window.innerHeight - state.height - 20; // 20px margin from the bottom
+                state.left = window.innerWidth - state.width - 20; // 20px margin from the right
+            },   
+            // position: "center", // Center the window on the screen         
+            modal: true,
+            head: "Processing Dropbox JSONs...",
+            body: {
+                id: "progressTemplate",
+                view: "template",
+                template: "<div style='width:100%; background-color:#ddd;'><div id='progressBar' style='width:0%; height:30px; background-color:green;'></div></div>",
+            }
+        });  
 
       ///////////////////////////////////////////////
 
