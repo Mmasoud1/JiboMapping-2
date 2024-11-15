@@ -2498,9 +2498,6 @@
                 if(rawJsonData[i]["Event type"] != null && rawJsonData[i]["Event type"] === "WORD_TAPPED" ) { 
                    
                    newSheetRow["Index/ Line Word Tapped "] = '"index":' + JSON.parse(rawJsonData[i]["Message"])["index"]
-
-                   
-
                 }
 
                 // Disable this for now by set false   //////// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -2518,12 +2515,13 @@
                 
                 if( ( rawJsonData[i]["Event type"] === "WORD_TAPPED" ) && ( rawJsonData[i]["Message"] != null) ) {
                     
-                    if( rawJsonData[i]["Message"].includes("word") ) { 
+                    // if( rawJsonData[i]["Message"].includes("word") ) { 
                        
-                       newSheetRow["Word Tapped "] = JSON.parse(rawJsonData[i]["Message"])["word"];
-                       console.log(" word found :", newSheetRow["Word Tapped "] )
+                    //    newSheetRow["Word Tapped "] = JSON.parse(rawJsonData[i]["Message"])["word"];
+                    //    console.log(" word found :", newSheetRow["Word Tapped "] )
 
-                    } else if( rawJsonData[i]["Message"].includes('"index"') && !rawJsonData[i]["Message"].includes('"indexes"')) { 
+                    // } else 
+                    if( rawJsonData[i]["Message"].includes('"index"') && !rawJsonData[i]["Message"].includes('"indexes"')) { 
                         // Get the tapped word from dropbox Json file e.g. 
 
                         if(showProgressBarFlag) {
@@ -2598,13 +2596,14 @@
                 //--- Scene Object Tapped Column---//
                 /////////////////////////////////////
 
-                if(rawJsonData[i]["Message"] != null && rawJsonData[i]["Message"].includes("label") ) { 
+                if( ( rawJsonData[i]["Event type"] === "SCENE_OBJECT_TAPPED" ) &&  (rawJsonData[i]["Message"] != null) && rawJsonData[i]["Message"].includes("label") ) { 
 
                     if(rawJsonData[i]["Message"].includes("labels")) {
-                        newSheetRow["Scene Object Tapped"] = JSON.parse(rawJsonData[i]["Message"])["labels"];
+                        newSheetRow["Scene Object Tapped"] = JSON.parse(rawJsonData[i]["Message"])["labels"].join("; ");
+                        console.log("Scene Object Tapped: ", newSheetRow["Scene Object Tapped"])
 
                     } else  {
-                        newSheetRow["Scene Object Tapped"] = JSON.parse(rawJsonData[i]["Message"])["label"];
+                        newSheetRow["Scene Object Tapped"] = JSON.parse(rawJsonData[i]["Message"])["label"].join("; ");
                     }
 
                 }
@@ -2631,12 +2630,33 @@
                 let jiboTalkObj = getJiboStateObjByDateTime(rawJsonData[i]["Datetime"]);
                 // -- jiboTalkObj : { Datetime: "2020-12-11-18-05-13", jiboTalk: "What does it mean to reap the wheat? ", isQuestion: true }
 
-                if(jiboTalkObj != null) {
+                if (jiboTalkObj != null) {
+                    // Replace commas with semicolons in Jibo's question
+                    newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"].replace(/,/g, ";");
 
-                     newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"].replace(/,/g, ";");
+                    // Define the word tapped
+                    let wordTapped = newSheetRow["Word Tapped "];
+
+                    // Check if Word Tapped is a standalone word in the Jibo Question text
+                    if (wordTapped != null && wordTapped != "") {
+                        if(! new RegExp(`\\b${wordTapped}\\b`).test(newSheetRow["Jibo Asked Question"])) {
+                            newSheetRow["Jibo Asked Question"] = ""
+                        } 
+                    }
+
+
                 } else {
-                   console.log(" No Datetime matching for Jibo state talking object")
-                }
+                    console.log("No Datetime matching for Jibo state talking object");
+                }                
+
+
+                // Old Version
+                // if(jiboTalkObj != null) {
+
+                //      newSheetRow["Jibo Asked Question"] = jiboTalkObj["jiboTalk"].replace(/,/g, ";");
+                // } else {
+                //    console.log(" No Datetime matching for Jibo state talking object")
+                // }
 
                    
    
@@ -2753,10 +2773,29 @@
            $$("progressWindow").hide();
         }
 
+        
 
-         //// Remove first duplicates from newCleanDataSheet 
-         // newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
- 
+        // Remove duplicates from newCleanDataSheet 
+        newCleanDataSheet = Array.from(
+            new Set(newCleanDataSheet.map(item => JSON.stringify(item)))
+        ).map(item => JSON.parse(item));
+
+
+        // List of fields to check for empty values
+        const keysToMerge = [
+          "Tutorial Response", "Tutorial Command", "NEXT_PAGE Tapped ", 
+          "Index/ Line Word Tapped ", "Word Tapped ", "Scene Object Tapped", 
+          "Jibo buttom pressed", "Jibo Asked Question", "Jibo Command",  
+          "Transcription or word/ image tapped ", "No Response to Jibo",  
+          "Confidence level ", "Return to library Early", "Finished Storybook",
+          "Student Logout"
+        ];
+
+
+        // Function to check if a key belongs to keysToMerge
+        function isKeyInKeysToMerge(key) {
+            return keysToMerge.includes(key);
+        }
 
 
          // Merging similar Datetime rows
@@ -2770,6 +2809,11 @@
                                if(newCleanDataSheet[idx][key] == null || newCleanDataSheet[idx][key] === "") {
                                   // since current row cell is empty, and previous row cell is not, copy the value of previous cell into current row cell
                                   newCleanDataSheet[idx][key] = newCleanDataSheet[idx - 1][key];
+                               } else {  // if current row cell have value
+                                     if(isKeyInKeysToMerge(key) && newCleanDataSheet[idx - 1][key] !== null &&
+                                     newCleanDataSheet[idx - 1][key] !== "" ) {
+                                         newCleanDataSheet[idx][key] += "; " + newCleanDataSheet[idx - 1][key];
+                                     }
                                }
 
                       }
@@ -2778,6 +2822,36 @@
                  
             }
          }
+
+
+
+
+
+
+         //// Remove first duplicates from newCleanDataSheet 
+         // newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
+ 
+
+
+         // // Merging similar Datetime rows
+         // for( let idx = 1; idx < newCleanDataSheet.length; idx ++) {
+
+         //    if(newCleanDataSheet[idx]["Datetime"] === newCleanDataSheet[idx - 1]["Datetime"]) {
+
+         //         cleanDataKeys.forEach(key => {
+         //              //--key one of Array(31) [ "Participant", "Datetime", "Date", "Time", ..]
+         //              if(newCleanDataSheet[idx][key] !== newCleanDataSheet[idx - 1][key] ) {
+         //                       if(newCleanDataSheet[idx][key] == null || newCleanDataSheet[idx][key] === "") {
+         //                          // since current row cell is empty, and previous row cell is not, copy the value of previous cell into current row cell
+         //                          newCleanDataSheet[idx][key] = newCleanDataSheet[idx - 1][key];
+         //                       }
+
+         //              }
+
+         //         })
+                 
+         //    }
+         // }
  
 
           // Remove deplicate Datetime rows
@@ -2794,6 +2868,38 @@
 
          //// Remove first duplicates from newCleanDataSheet 
          //-- newCleanDataSheet = removeFirstDuplicateByKey( newCleanDataSheet, "Datetime" );
+
+
+
+
+          // Check for Jibo response and words tapped merged from abov step are matching, 
+          // Right reponse should have the tapped word.
+         for( let idx = 0; idx < newCleanDataSheet.length -1; idx++) {
+            
+            if (newCleanDataSheet[idx]["Word Tapped "] != null && newCleanDataSheet[idx]["Word Tapped "] != "") { 
+                const tappedWords = newCleanDataSheet[idx]["Word Tapped "].split(";").map(word => word.trim()); 
+
+                // Check if any word exists in text as a standalone word or letter
+                const isWordexists = tappedWords.some(word => {
+                    // Create a regular expression to match the word as a standalone word
+                    const regex = new RegExp(`\\b${word}\\b`);
+                    return regex.test(newCleanDataSheet[idx]["Jibo Asked Question"]);
+                });  
+
+                if(! isWordexists) { // No word exist with jibo reponse 
+                    newCleanDataSheet[idx]["Jibo Asked Question"] = "";
+                }          
+            }
+
+
+            // Cleanining, if Next page tapped, make sure nothing with jibo response 
+            if (newCleanDataSheet[idx]["NEXT_PAGE Tapped "] === "NEXT_PAGE") { 
+                       
+                    newCleanDataSheet[idx]["Jibo Asked Question"] = "";
+            }            
+         }
+
+
 
 
         // List of fields to check for empty values
@@ -3174,21 +3280,42 @@
                                                //-- rawJiboState[0] :{ Datetime: "2020-12-11-17-41-39",  in_motion: "" , audio:  "",  tts_msg: "Look at all those storybooks!", volume:   "and selecting the book you want to read", led_color: "NO DATA", lookat: NO DATA , doing_motion: True , is_playing_sound: True ,  is_listening: False }
 
                                               if($$("removeDuplicatesBtn").getValue()) {
-                                                  // Filter duplicates
-                                                  let filteredJiboState = [];
+
+
+                                                  // Remove duplicates based on specific keys
                                                   let seen = new Set();
+                                                  rawJiboState = rawJiboState.filter(item => {
+                                                        // Create a unique identifier using specific keys
+                                                        let identifier = `${item.Datetime}|${item.tts_msg}|${item.volume}|${item.led_color}|${item.lookat}`;
+                                                        
+                                                        if (!seen.has(identifier)) {
+                                                            seen.add(identifier);
+                                                            return true; // Keep the object
+                                                        }
+                                                        return false; // Filter out duplicate
+                                                  });                                                
 
-                                                  rawJiboState.forEach(item => {
-                                                      // Create a unique identifier based on the content of the other columns
-                                                      let identifier = `${item.in_motion}|${item.audio}|${item.tts_msg}|${item.volume}|${item.led_color}|${item.lookat}|${item.doing_motion}|${item.is_playing_sound}|${item.is_listening}`;
+                                                  // // Remove duplicated objects, all keys
+                                                  // rawJiboState = Array.from(
+                                                  //     new Set(rawJiboState.map(item => JSON.stringify(item)))
+                                                  // ).map(item => JSON.parse(item));
 
-                                                      if (!seen.has(identifier)) {
-                                                          filteredJiboState.push(item);
-                                                          seen.add(identifier);
-                                                      }
-                                                   });    
 
-                                                   rawJiboState = filteredJiboState;                                              
+                                                  // // Filter duplicates  -- Another approach..
+                                                  // let filteredJiboState = [];
+                                                  // let seen = new Set();
+
+                                                  // rawJiboState.forEach(item => {
+                                                  //     // Create a unique identifier based on the content of the other columns
+                                                  //     let identifier = `${item.in_motion}|${item.audio}|${item.tts_msg}|${item.volume}|${item.led_color}|${item.lookat}|${item.doing_motion}|${item.is_playing_sound}|${item.is_listening}`;
+
+                                                  //     if (!seen.has(identifier)) {
+                                                  //         filteredJiboState.push(item);
+                                                  //         seen.add(identifier);
+                                                  //     }
+                                                  //  });    
+
+                                                  //  rawJiboState = filteredJiboState;                                              
 
                                               } 
 
