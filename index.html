@@ -327,6 +327,7 @@
 
     async function readJsonFile(fileName) {
         try {
+            console.log('Try reading JSON file:', fileName);
             const response = await dbx.filesDownload({ path: '/qna_json_merged' + fileName });
             const blob = response.result.fileBlob || response.result.fileBinary || response.fileBlob || response.fileBinary;
 
@@ -349,7 +350,8 @@
                 reader.readAsText(blob);
             });
         } catch (error) {
-            console.error('Error reading JSON file:', error);
+            // console.error('Error reading JSON file:', fileName);
+            console.error('Error reason:', error);
             if (error.status === 401) { // If the token has expired
                 const { refreshToken, clientId, clientSecret } = loadSettings();
                 const newAccessToken = await refreshAccessToken(refreshToken, clientId, clientSecret);
@@ -489,8 +491,30 @@
     }
 
 
+    // Function to process the jibo_asr.csv content
+    processJiboAsrCSV_old = (csv) => {
+      // Split the content by lines
+      let lines = csv.split('\n');
 
-    combineAndSortFiles = (fileContents) => {
+      // Rename the header instead of Datetime;Jibo Command;Transcription;Confidence
+      lines[0] = 'Datetime;Event type;Message';
+
+      // Filter out lines with 'Receive Listen Command;;' and remove Confidence column
+      let filteredLines = lines
+        .filter(line => !line.includes('Receive Listen Command;;'))
+        .map(line => {
+          // Split the line by semicolon and remove the Confidence column
+          let parts = line.split(';');
+          return parts.slice(0, 3).join(';'); // Keep only the first three parts
+        });
+
+      // Join the lines back into a single string
+      return filteredLines.join('\n');
+    }
+
+
+
+    xxxx_combineAndSortFiles_old = (fileContents) => {
 
         const headerLine = 'Datetime;Event type;Message';
         const firstFileHeader = fileContents[0].split('\n')[0].trim();
@@ -517,7 +541,17 @@
 
 
         const eventData = Papa.parse(fileContents[0], { header: true, delimiter: ';', skipEmptyLines: true }).data;
+        console.log("eventData :", eventData)
         const commandData = Papa.parse(fileContents[1], { header: false, delimiter: ';', skipEmptyLines: true }).data;
+        let asrData = null;
+
+        console.log("commandData :", commandData)
+
+        if( fileContents.length == 3 ) {
+           asrData = Papa.parse(processJiboAsrCSV(fileContents[2]), { header: false, delimiter: ';', skipEmptyLines: true }).data;
+        }
+
+        console.log("asrData :", asrData)
 
         const processedCommandData = commandData.map(row => ({
             "Datetime": row[0],
@@ -525,7 +559,7 @@
             "Message": row[2]
         }));
 
-        const combinedData = [...eventData, ...processedCommandData];
+        const combinedData = asrData == null ? [...eventData, ...processedCommandData] : [...eventData, ...processedCommandData, ...asrData] ;
 
         // combinedData.sort((a, b) => ( parseDatetime(a.Datetime) >= parseDatetime(b.Datetime) ? 1 : -1 ) );
 
@@ -563,6 +597,137 @@
         return combinedData;
 
     }
+
+
+
+// function processJiboAsrCSV(asrFileContent) {
+//     if (!asrFileContent) {
+//         console.error("Error: ASR file content is undefined or empty.");
+//         return '';
+//     }
+
+//     let rows = asrFileContent.split('\n');
+
+//     const headerRow = rows[0];
+//     const dataRows = rows.slice(1);
+
+//     const filteredRows = dataRows.filter(row => !row.includes('Receive Listen Command;;'));
+
+//     const processedRows = filteredRows.map(row => {
+//         const columns = row.split(';');
+//         return `${columns[0]};${columns[1]};${columns[2] || ''}`;
+//     });
+
+//     const newHeader = 'Datetime;Event type;Message';
+//     return [newHeader, ...processedRows].join('\n');
+// }
+
+
+function processJiboAsrCSV(asrFileContent) {
+    if (!asrFileContent) {
+        console.error("Error: ASR file content is undefined or empty.");
+        return '';
+    }
+
+    // Split the file into rows
+    let rows = asrFileContent.split('\n').filter(row => row.trim() !== '');
+
+    // Extract the header row and data rows
+    const headerRow = rows[0];
+    const dataRows = rows.slice(1);
+
+    // Filter out rows with "Receive Listen Command;;"
+    const filteredRows = dataRows.filter(row => !row.includes('Receive Listen Command;;'));
+
+    // Map the remaining rows to match the new header format
+    const processedRows = filteredRows.map(row => {
+        const columns = row.split(';');
+        if (columns.length < 3) return null; // Skip incomplete rows
+        return `${columns[0]};${columns[1]};${columns[2] || ''}`; // Use empty string if Message is undefined
+    }).filter(row => row !== null); // Remove null values from the array
+
+    // Define the new header
+    const newHeader = 'Datetime;Event type;Message';
+
+    // Combine the new header with processed rows
+    return [newHeader, ...processedRows].join('\n');
+}
+
+
+
+
+
+combineAndSortFiles = (fileContents) => {
+    const headerLine = 'Datetime;Event type;Message';
+    const firstFileHeader = fileContents[0].split('\n')[0].trim();
+
+    if (firstFileHeader !== headerLine) {
+        const secondFileHeader = fileContents[1].split('\n')[0].trim();
+
+        if (secondFileHeader !== headerLine) {
+            alert('No file is the storybook_event.csv with the correct header');
+            return;
+        } else {
+            // Swap command file contents with event contents to make event contents come first
+            let temp = fileContents[0];
+            fileContents[0] = fileContents[1];
+            fileContents[1] = temp;
+        }
+    }
+
+    const eventData = Papa.parse(fileContents[0], { header: true, delimiter: ';', skipEmptyLines: true }).data;
+    const commandData = Papa.parse(fileContents[1], { header: false, delimiter: ';', skipEmptyLines: true }).data;
+
+    let asrData = null;
+
+    if (fileContents.length === 3) {
+        console.log("Processing jibo_asr.csv...");
+        // console.log("Raw ASR file content:", fileContents[2]);
+
+        // Check if the content exists before processing
+        if (!fileContents[2]) {
+            console.error("Error: jibo_asr.csv content is undefined.");
+            return;
+        }
+
+        const cleanedAsrFile = processJiboAsrCSV(fileContents[2]);
+        // console.log(" cleanedAsrFile :", cleanedAsrFile)
+        asrData = Papa.parse(cleanedAsrFile, { header: true, delimiter: ';', skipEmptyLines: true }).data;
+    }
+
+    const processedCommandData = commandData.map(row => ({
+        "Datetime": row[0],
+        "Event type": row[1],
+        "Message": row[2]
+    }));
+
+    const combinedData = asrData === null
+        ? [...eventData, ...processedCommandData]
+        : [...eventData, ...processedCommandData, ...asrData];
+
+    combinedData.sort((a, b) => {
+        const dateComparison = parseDatetime(a.Datetime) - parseDatetime(b.Datetime);
+        if (dateComparison !== 0) {
+            return dateComparison;
+        }
+
+        if ((a["Event type"] === "HELLO_WORLD" || a["Event type"] === "HELLO WORLD MSG") &&
+            (b["Event type"] !== "HELLO_WORLD" && b["Event type"] !== "HELLO WORLD MSG")) {
+            return -1;
+        }
+        if ((b["Event type"] === "HELLO_WORLD" || b["Event type"] === "HELLO WORLD MSG") &&
+            (a["Event type"] !== "HELLO_WORLD" && a["Event type"] !== "HELLO WORLD MSG")) {
+            return 1;
+        }
+
+        return 0;
+    });
+
+    return combinedData;
+};
+
+
+
 
 
   /**
@@ -1232,7 +1397,7 @@
                 let [year, month, day, hour24, minute, second] = rawJsonData[i]["Datetime"].split("-");
 
                 // Format the date
-                let date = `${year}-${month}-${day}`;
+                let date = `${year}/${month}/${day}`;
 
                 // Format the time
                 let hour = parseInt(hour24, 10);
@@ -2008,18 +2173,35 @@
 
 
 
+        // newSheetObj = {"Participant" : null, "Datetime" : null, "Date" : null, "Time" : null, 
+        //               "Storybook Selected" : null, "Total Page Number" : null, "Page Number" : null, 
+        //               "Line" : null, "Automatic Storytelling vs Selected Storytelling " : "", 
+        //               "Seconds" : null, "Time Stopes" : "", "Time Reading " : "", "Paused" : "", 
+        //               "Total Time Reading" : "",  "Total Time Paused" : "", "Total Time in Storybook" : "",  
+        //               "Tutorial Response" : "",  "Tutorial Command" : "", "NEXT_PAGE Tapped " : "", 
+        //               "Index/ Line Word Tapped " : "",  "Word Tapped " : "",  "Scene Object Tapped" : "", 
+        //               "Jibo buttom pressed" : "", "Jibo Asked Question" : "", "Jibo Command" : "",  
+        //               "Transcription or word/ image tapped " : "",  "No Response to Jibo" : "",  
+        //               "Confidence level " : "", "Return to library Early" : "", "Finished Storybook" : "",
+        //                "Student Logout" : "" }
+
+                 // WITHOUT:  
+                 // "Total Time Reading",  "Total Time Paused",   "Total Time in Storybook",
+                 //  "Jibo Command",  "Confidence level "
+
         newSheetObj = {"Participant" : null, "Datetime" : null, "Date" : null, "Time" : null, 
                       "Storybook Selected" : null, "Total Page Number" : null, "Page Number" : null, 
                       "Line" : null, "Automatic Storytelling vs Selected Storytelling " : "", 
                       "Seconds" : null, "Time Stopes" : "", "Time Reading " : "", "Paused" : "", 
-                      "Total Time Reading" : "",  "Total Time Paused" : "", "Total Time in Storybook" : "",  
+                      // "Total Time Reading" : "",  "Total Time Paused" : "", "Total Time in Storybook" : "", 
                       "Tutorial Response" : "",  "Tutorial Command" : "", "NEXT_PAGE Tapped " : "", 
                       "Index/ Line Word Tapped " : "",  "Word Tapped " : "",  "Scene Object Tapped" : "", 
-                      "Jibo buttom pressed" : "", "Jibo Asked Question" : "", "Jibo Command" : "",  
+                      "Jibo buttom pressed" : "", "Jibo Asked Question" : "",  
+                      // "Jibo Command" : "", 
                       "Transcription or word/ image tapped " : "",  "No Response to Jibo" : "",  
-                      "Confidence level " : "", "Return to library Early" : "", "Finished Storybook" : "",
+                      // "Confidence level " : "",
+                      "Return to library Early" : "", "Finished Storybook" : "",
                        "Student Logout" : "" }
-
 
 
         let cleanDataKeys = Object.keys(newSheetObj);
@@ -2215,7 +2397,8 @@
                 let [year, month, day, hour24, minute, second] = rawJsonData[i]["Datetime"].split("-");
 
                 // Format the date
-                let date = `${year}-${month}-${day}`;
+                // let date = `${year}-${month}-${day}`;
+                let date = `${year}/${month}/${day}`;
 
                 // Format the time
                 let hour = parseInt(hour24, 10);
@@ -2430,20 +2613,20 @@
                          if(currentState === "" && prevState === "Automatic") {
                              let timeReading = parseDatetime( newCleanDataSheet[i - 1]["Datetime"] ) - parseDatetime( readStartAt );
                              newSheetRow["Time Reading "] = formatTime( timeReading );
-                             totalTimeReading = totalTimeReading + timeReading;
-                             newSheetRow["Total Time Reading"] = formatTime(totalTimeReading);
-                             newSheetRow["Total Time Paused"] = formatTime(totalTimePaused);
-                             newSheetRow["Total Time in Storybook"] = formatTime(totalTimePaused + totalTimeReading);
+                             // totalTimeReading = totalTimeReading + timeReading;
+                             // newSheetRow["Total Time Reading"] = formatTime(totalTimeReading);
+                             // newSheetRow["Total Time Paused"] = formatTime(totalTimePaused);
+                             // newSheetRow["Total Time in Storybook"] = formatTime(totalTimePaused + totalTimeReading);
 
                          }
 
                          if(currentState === "" && prevState === "Paused") {
                             let timePaused = parseDatetime( newCleanDataSheet[i - 1]["Datetime"] ) - parseDatetime( pauseStartAt );
                             newSheetRow["Paused"] = formatTime(timePaused);
-                            totalTimePaused = totalTimePaused + timePaused;
-                            newSheetRow["Total Time Paused"] = formatTime(totalTimePaused);
-                            newSheetRow["Total Time Reading"] = formatTime(totalTimeReading);
-                            newSheetRow["Total Time in Storybook"] = formatTime(totalTimePaused + totalTimeReading);
+                            // totalTimePaused = totalTimePaused + timePaused;
+                            // newSheetRow["Total Time Paused"] = formatTime(totalTimePaused);
+                            // newSheetRow["Total Time Reading"] = formatTime(totalTimeReading);
+                            // newSheetRow["Total Time in Storybook"] = formatTime(totalTimePaused + totalTimeReading);
                          }                                                  
 
                    } 
@@ -2667,7 +2850,7 @@
 
                 if(rawJsonData[i]["Event type"] === "Receive Listen Command") {
                    
-                   newSheetRow["Jibo Command"] = "Receive Listen Command";
+                 //  newSheetRow["Jibo Command"] = "Receive Listen Command";
 
                 }
 
@@ -2679,24 +2862,40 @@
 
                 // -- /[{}:]/.test(someString) will check if that string has any of the those characers {, }, :
 
-                if(rawJsonData[i]["Message"] !== "NOSPEECH" &&  rawJsonData[i]["Message"] != null &&
-                   !rawJsonData[i]["Message"].includes("Explore mode") && ! /[{}:]/.test(rawJsonData[i]["Message"])) { 
+                // if(rawJsonData[i]["Message"] !== "NOSPEECH" &&  rawJsonData[i]["Message"] != null &&
+                //    !rawJsonData[i]["Message"].includes("Explore mode") && ! /[{}:]/.test(rawJsonData[i]["Message"])) { 
+                   
+                //    newSheetRow["Transcription or word/ image tapped "] = rawJsonData[i]["Message"];
+
+                // }
+
+
+                if( rawJsonData[i]["Event type"].includes("Result") && rawJsonData[i]["Message"] != null &&
+                    rawJsonData[i]["Message"] !== "NOSPEECH" ) {
                    
                    newSheetRow["Transcription or word/ image tapped "] = rawJsonData[i]["Message"];
 
                 }
 
 
+
+
                 ///////////////////////////////////
                 //--No Response to Jibo Column --//
                 ///////////////////////////////////
 
-                if(rawJsonData[i]["Message"] === "NOSPEECH" || rawJsonData[i]["Message"].includes("NOSPEECH") ) {
+                // if(rawJsonData[i]["Message"] === "NOSPEECH" || rawJsonData[i]["Message"].includes("NOSPEECH") ) {
+                   
+                //    newSheetRow["No Response to Jibo"] = "NOSPEECH";
+
+                // }
+
+
+                if( rawJsonData[i]["Event type"].includes("Result") && ( rawJsonData[i]["Message"] === "NOSPEECH" || rawJsonData[i]["Message"].includes("NOSPEECH") )  ) {
                    
                    newSheetRow["No Response to Jibo"] = "NOSPEECH";
 
                 }
-
 
 
 
@@ -2706,7 +2905,7 @@
 
                 if(rawJsonData[i]["Event type"] === "?????????????") {     /// <<<<<<<<<
                    
-                   newSheetRow["Confidence level "] = "?????";
+                   // newSheetRow["Confidence level "] = "?????";
 
                 }                                
 
@@ -2785,9 +2984,11 @@
         const keysToMerge = [
           "Tutorial Response", "Tutorial Command", "NEXT_PAGE Tapped ", 
           "Index/ Line Word Tapped ", "Word Tapped ", "Scene Object Tapped", 
-          "Jibo buttom pressed", "Jibo Asked Question", "Jibo Command",  
+          "Jibo buttom pressed", "Jibo Asked Question",
+          // "Jibo Command",  
           "Transcription or word/ image tapped ", "No Response to Jibo",  
-          "Confidence level ", "Return to library Early", "Finished Storybook",
+          // "Confidence level " : "",
+          "Return to library Early", "Finished Storybook",
           "Student Logout"
         ];
 
@@ -2905,12 +3106,14 @@
         // List of fields to check for empty values
         const fieldsToCheck = [
           "Time Stopes", "Time Reading ", "Paused", 
-          "Total Time Reading", "Total Time Paused", "Total Time in Storybook",  
+          // "Total Time Reading", "Total Time Paused", "Total Time in Storybook",  
           "Tutorial Response", "Tutorial Command", "NEXT_PAGE Tapped ", 
           "Index/ Line Word Tapped ", "Word Tapped ", "Scene Object Tapped", 
-          "Jibo buttom pressed", "Jibo Asked Question", "Jibo Command",  
+          "Jibo buttom pressed", "Jibo Asked Question", 
+          // "Jibo Command",  
           "Transcription or word/ image tapped ", "No Response to Jibo",  
-          "Confidence level ", "Return to library Early", "Finished Storybook",
+          // "Confidence level " : "",
+          "Return to library Early", "Finished Storybook",
           "Student Logout"
         ];
 
@@ -2963,6 +3166,7 @@
       let swTimeOut = 1000;   
 
       let rawCsvFileNames = [];
+      let filesToProcess = 0;
       //--rawCsvFileNames : Array [ "storybook_event.csv", "storybook_command.csv" ]
       rawCsvFileContents = [];
 
@@ -3034,6 +3238,10 @@
                                   //--OR
                                   //--rawCsvFileNames : Array["combined104.csv"]
 
+                                  // filesToProcess Counter tracks the total number of files being uploaded.
+                                  // It also ensures processing occurs only after all files are fully read.
+                                  filesToProcess++;
+
                                   let reader = new FileReader();  
 
                                   reader.onloadend = function(event) {
@@ -3042,95 +3250,139 @@
 
                                           rawCsvFileContents.push(event.target.result);
 
-                                          if (rawCsvFileContents.length === 2) { 
-                                          // 2 files are selected "storybook_event.csv", "storybook_command.csv"
+                                          // Check if all files are processed/uploaded
+                                          if (rawCsvFileContents.length === filesToProcess) {                                          
 
-                                              if(rawCsvFileNames[0] === "storybook_event.csv" && 
-                                                 rawCsvFileNames[1] === "storybook_command.csv") {
+                                              if (rawCsvFileContents.length >= 2) { 
+                                              // 2 or 3 files are selected "storybook_event.csv", "storybook_command.csv", "jibo_asr.csv"
 
-                                                   console.log("Correct file orders");
-                                                   rawJsonData = combineAndSortFiles(rawCsvFileContents);
+                                                  console.log(" rawCsvFileContents.length = ", rawCsvFileContents.length)
+
+                                                  console.log(" rawCsvFileNames :", rawCsvFileNames);
+
+                                                  if (rawCsvFileNames.includes("storybook_event.csv") && 
+                                                      rawCsvFileNames.includes("storybook_command.csv")) {
+
+
+                                                      if(rawCsvFileNames[0] === "storybook_event.csv" && 
+                                                         rawCsvFileNames[1] === "storybook_command.csv") {
+
+                                                           console.log("Correct file orders");
+                                                           rawJsonData = combineAndSortFiles(rawCsvFileContents);
+                                                          
+
+                                                      } else if(rawCsvFileNames[0] !== "storybook_event.csv" ||
+                                                                rawCsvFileNames[1] !== "storybook_command.csv") {
+
+                                                           console.log("Incorrect files orders, needs swaping");
+
+                                                           let eventIndex = rawCsvFileNames.indexOf("storybook_event.csv");
+                                                           let commandIndex = rawCsvFileNames.indexOf("storybook_command.csv");
+                                                           let asrIndex = rawCsvFileNames.indexOf("jibo_asr.csv");
+                                                           // asrIndex if not exist (file not selected) will be -1
+
+
+
+                                                           // Swap names
+                                                           if (asrIndex == -1) { // optional jibo_asr not selected
+
+                                                               let tempName = rawCsvFileNames[0];
+                                                               rawCsvFileNames[0] = rawCsvFileNames[1]
+                                                               rawCsvFileNames[1] = tempName;
+
+                                                               //Swap contents
+                                                               let tempContents = rawCsvFileContents[0];
+                                                               rawCsvFileContents[0] = rawCsvFileContents[1];
+                                                               rawCsvFileContents[1] = tempContents;
+
+                                                           } else {
+
+                                                               let asrContents = rawCsvFileContents[asrIndex];
+                                                               let eventContents = rawCsvFileContents[eventIndex];
+                                                               let commandContents = rawCsvFileContents[commandIndex];
+
+                                                               rawCsvFileNames[0] = "storybook_event.csv";
+                                                               rawCsvFileNames[1] = "storybook_command.csv";
+                                                               rawCsvFileNames[2] = "jibo_asr.csv";
+
+                                                               //Swap contents
+                                                               rawCsvFileContents[0] = eventContents;
+                                                               rawCsvFileContents[1] = commandContents;
+                                                               rawCsvFileContents[2] = asrContents;
+
+                                                           }
+
+
+                                                           rawJsonData = combineAndSortFiles(rawCsvFileContents);
+
+                                                      } else {
+                                                            alert('Please select 3 files: storybook_event.csv,  storybook_command.csv, and jibo_asr.csv(optional)');
+                                                            return;
+                                                      }
+
+                                                  } else {
+                                                            alert('Uploaded files does not have storybook_event.csv or storybook_command.csv');
+                                                            return;
+                                                  }
+
+                                              } 
+
+                                              if (rawCsvFileContents.length === 1) { // one csv file e.g. combine104.csv
+
+                                                   if(rawCsvFileNames[0] !== "storybook_event.csv" && rawCsvFileNames[0] !== "storybook_command.csv") {
+
+                                                       const delimiter = detectDelimiter(event.target.result);
+
+                                                       // Convert CSV data to JSON
+                                                       rawJsonData = convertCsv2Json(event.target.result, delimiter); 
+                                                       console.log(event.target.result)
+                                                       console.log(" test here ------")
+                                                       console.log("rawJsonData :", rawJsonData)
+                                                       //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD",    Message: null, "": null, _1: null, _2: null, _3: null, _4: null }  
+
+                                                       
+                                                       // if "Message" need split  
+                                                       if(Object.keys(rawJsonData[0]).length == 3) {
+                                                          // Transform the JSON array
+                                                          // rawJsonData = transformJsonArray(rawJsonData);
+                                                       }  
+                                                   }  else {
+
+                                                           return;
+                                                   }
+
+                                              } 
+
+                                              // if rawJsonData found from uploaded file/s
+                                              if( ( Object.keys(rawJsonData[0]).length >= 3 ) && 
+                                                  (rawJsonData.length > 1)  ) {
+
+                                                     webix.message({
+                                                        text: rawCsvFileNames + " uploaded.",
+                                                        expire: 5000, // time in milliseconds after which the message will disappear
+                                                        type: "info",
+                                                        css: "my-popup"
+                                                     });              
+
+                                                     // Open  RAW CSV tab 
+                                                     // $$("tabview").setValue("rawCsvTab");
+
+                                                     $$("rawCsvUploader").disable();                                         
+                                                     // Draw table with Raw tab for visualization 
+                                                     convert2Table(JSON.parse(JSON.stringify(rawJsonData)), "rawCsvTableId", enableRankFlag,true);
+
                                                   
-
-                                              } else if(rawCsvFileNames[1] === "storybook_event.csv" &&
-                                                        rawCsvFileNames[0] === "storybook_command.csv") {
-
-                                                         console.log("Incorrect files orders, needs swaping");
-
-                                                         // Swap names
-                                                         let tempName = rawCsvFileNames[0];
-                                                         rawCsvFileNames[0] = rawCsvFileNames[1]
-                                                         rawCsvFileNames[1] = tempName;
-
-                                                         //Swap contents
-                                                         let tempContents = rawCsvFileContents[0];
-                                                         rawCsvFileContents[0] = rawCsvFileContents[1];
-                                                         rawCsvFileContents[1] = tempContents;
-
-                                                         rawJsonData = combineAndSortFiles(rawCsvFileContents);
+                                                     // Check if all needed CSV fils uploaded 
+                                                     if(checkAllUpload()) {
+                                                           $$("convertBtn").enable();
+                                                     }  
 
                                               } else {
-                                                    alert('Please select 2 files: storybook_event.csv and storybook_command.csv');
-                                                    return;
+                                                        alert('No valid raw csv file/files uploaded ...');
+                                                        return;
                                               }
-                                              
 
-                                          } 
-
-                                          if (rawCsvFileContents.length === 1) { // one csv file e.g. combine104.csv
-
-                                               if(rawCsvFileNames[0] !== "storybook_event.csv" && rawCsvFileNames[0] !== "storybook_command.csv") {
-
-                                                   const delimiter = detectDelimiter(event.target.result);
-
-                                                   // Convert CSV data to JSON
-                                                   rawJsonData = convertCsv2Json(event.target.result, delimiter); 
-                                                   console.log(event.target.result)
-                                                   console.log(" test here ------")
-                                                   console.log("rawJsonData :", rawJsonData)
-                                                   //-- rawJsonData[0] :{ Datetime: "2020-12-11-17-35-02", "Event type": "HELLO_WORLD",    Message: null, "": null, _1: null, _2: null, _3: null, _4: null }  
-
-                                                   
-                                                   // if "Message" need split  
-                                                   if(Object.keys(rawJsonData[0]).length == 3) {
-                                                      // Transform the JSON array
-                                                      // rawJsonData = transformJsonArray(rawJsonData);
-                                                   }  
-                                               }  else {
-
-                                                       return;
-                                               }
-
-                                          } 
-
-                                          // if rawJsonData found from uploaded file/s
-                                          if( ( Object.keys(rawJsonData[0]).length >= 3 ) && 
-                                              (rawJsonData.length > 1)  ) {
-
-                                                 webix.message({
-                                                    text: rawCsvFileNames + " uploaded.",
-                                                    expire: 5000, // time in milliseconds after which the message will disappear
-                                                    type: "info",
-                                                    css: "my-popup"
-                                                 });              
-
-                                                 // Open  RAW CSV tab 
-                                                 // $$("tabview").setValue("rawCsvTab");
-
-                                                 $$("rawCsvUploader").disable();                                         
-                                                 // Draw table with Raw tab for visualization 
-                                                 convert2Table(JSON.parse(JSON.stringify(rawJsonData)), "rawCsvTableId", enableRankFlag,true);
-
-                                              
-                                                 // Check if all needed CSV fils uploaded 
-                                                 if(checkAllUpload()) {
-                                                       $$("convertBtn").enable();
-                                                 }  
-
-                                          } else {
-                                                    alert('No valid raw csv file/files uploaded ...');
-                                                    return;
-                                          }
+                                          } // end of if (rawCsvFileContents.length === filesToProcess)
                                       }
                                   };
 
@@ -3144,6 +3396,11 @@
 
       ]}
  
+
+
+
+
+
 
       let storybookStateFile = {view: "form", css: {"border-radius": "20px"},  elements: [ 
                          { type:"header", template:"Load Storybook State"},
@@ -3236,7 +3493,7 @@
                                   { view: "switch", label: "Remove Duplicate",  
                                     offLabel: "Off", 
                                     onLabel: "On", 
-                                    value: 0, 
+                                    value: 1, 
                                     labelWidth:130, 
                                     id: "removeDuplicatesBtn", 
                                     align: "left"
@@ -3596,6 +3853,7 @@
               if( $$("convertBtn").getValue() ) {
 
                  rawCsvFileNames = [];
+                 filesToProcess = 0;
                  rawCsvFileContents = [];
                  StorybookStateFileName = '';
                  jiboStateFileName = '';
