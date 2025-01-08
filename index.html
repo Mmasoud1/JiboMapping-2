@@ -2198,7 +2198,8 @@ combineAndSortFiles = (fileContents) => {
                       "Index/ Line Word Tapped " : "",  "Word Tapped " : "",  "Scene Object Tapped" : "", 
                       "Jibo buttom pressed" : "", "Jibo Asked Question" : "",  
                       // "Jibo Command" : "", 
-                      "Transcription or word/ image tapped " : "",  "No Response to Jibo" : "",  
+                      "Transcription or word/ image tapped " : "",  
+                      // "No Response to Jibo" : "",  
                       // "Confidence level " : "",
                       "Return to library Early" : "", "Finished Storybook" : "",
                        "Student Logout" : "" }
@@ -2869,33 +2870,33 @@ combineAndSortFiles = (fileContents) => {
 
                 // }
 
+                 //------------- Last ones below ---------------------------------//
 
-                if( rawJsonData[i]["Event type"].includes("Result") && rawJsonData[i]["Message"] != null &&
-                    rawJsonData[i]["Message"] !== "NOSPEECH" ) {
+                // if( rawJsonData[i]["Event type"].includes("Result") && rawJsonData[i]["Message"] != null &&
+                //     rawJsonData[i]["Message"] !== "NOSPEECH" ) {
+                   
+                //    newSheetRow["Transcription or word/ image tapped "] = rawJsonData[i]["Message"];
+
+                // }
+
+                if( rawJsonData[i]["Event type"].includes("Result") && rawJsonData[i]["Message"] != null ) {
                    
                    newSheetRow["Transcription or word/ image tapped "] = rawJsonData[i]["Message"];
 
                 }
 
 
-
-
                 ///////////////////////////////////
                 //--No Response to Jibo Column --//
                 ///////////////////////////////////
 
-                // if(rawJsonData[i]["Message"] === "NOSPEECH" || rawJsonData[i]["Message"].includes("NOSPEECH") ) {
+
+
+                // if( rawJsonData[i]["Event type"].includes("Result") && ( rawJsonData[i]["Message"] === "NOSPEECH" || rawJsonData[i]["Message"].includes("NOSPEECH") )  ) {
                    
                 //    newSheetRow["No Response to Jibo"] = "NOSPEECH";
 
                 // }
-
-
-                if( rawJsonData[i]["Event type"].includes("Result") && ( rawJsonData[i]["Message"] === "NOSPEECH" || rawJsonData[i]["Message"].includes("NOSPEECH") )  ) {
-                   
-                   newSheetRow["No Response to Jibo"] = "NOSPEECH";
-
-                }
 
 
 
@@ -2986,7 +2987,8 @@ combineAndSortFiles = (fileContents) => {
           "Index/ Line Word Tapped ", "Word Tapped ", "Scene Object Tapped", 
           "Jibo buttom pressed", "Jibo Asked Question",
           // "Jibo Command",  
-          "Transcription or word/ image tapped ", "No Response to Jibo",  
+          "Transcription or word/ image tapped ", 
+          // "No Response to Jibo",  
           // "Confidence level " : "",
           "Return to library Early", "Finished Storybook",
           "Student Logout"
@@ -3097,8 +3099,48 @@ combineAndSortFiles = (fileContents) => {
             if (newCleanDataSheet[idx]["NEXT_PAGE Tapped "] === "NEXT_PAGE") { 
                        
                     newCleanDataSheet[idx]["Jibo Asked Question"] = "";
-            }            
+            } 
+
+            // Remove JIBO_QUESTION_ASKING_ACTIVITY text if no "?" found with "Jibo Asked Question" column
+            if ( (newCleanDataSheet[idx]["Jibo buttom pressed"] === "JIBO_QUESTION_ASKING_ACTIVITY" ) && 
+                 ( ! newCleanDataSheet[idx]["Jibo Asked Question"].includes("?") ) ) { 
+                       
+                    newCleanDataSheet[idx]["Jibo buttom pressed"] = "";
+            } 
+
+
+
          }
+
+
+        // To remove duplications in newCleanDataSheet[idx]["Jibo Asked Question"]
+        function removeRedundantQuestions(newCleanDataSheet) {
+            let lastUniqueQuestion = null; // To store the last non-duplicate question
+
+            for (let idx = 0; idx < newCleanDataSheet.length; idx++) {
+                const row = newCleanDataSheet[idx];
+
+                // Check if "Jibo Asked Question" is a duplicate and other fields are empty
+                if (
+                    row["Jibo Asked Question"] === lastUniqueQuestion &&
+                    !row["Jibo buttom pressed"] &&
+                    !row["Word Tapped "] &&
+                    !row["Scene Object Tapped"] &&
+                    !row["Transcription or word/ image tapped "]
+                ) {
+                    // Clear the duplicate question
+                    row["Jibo Asked Question"] = null; // Or use an empty string ("") if preferred
+                } else {
+                    // Update the last unique question if the current one is not a duplicate
+                    lastUniqueQuestion = row["Jibo Asked Question"];
+                }
+            }
+
+            return newCleanDataSheet; // Return the updated array
+        }
+
+        
+        newCleanDataSheet = removeRedundantQuestions(newCleanDataSheet);
 
 
 
@@ -3111,7 +3153,8 @@ combineAndSortFiles = (fileContents) => {
           "Index/ Line Word Tapped ", "Word Tapped ", "Scene Object Tapped", 
           "Jibo buttom pressed", "Jibo Asked Question", 
           // "Jibo Command",  
-          "Transcription or word/ image tapped ", "No Response to Jibo",  
+          "Transcription or word/ image tapped ", 
+          // "No Response to Jibo",  
           // "Confidence level " : "",
           "Return to library Early", "Finished Storybook",
           "Student Logout"
@@ -3493,7 +3536,7 @@ combineAndSortFiles = (fileContents) => {
                                   { view: "switch", label: "Remove Duplicate",  
                                     offLabel: "Off", 
                                     onLabel: "On", 
-                                    value: 1, 
+                                    value: 0, 
                                     labelWidth:130, 
                                     id: "removeDuplicatesBtn", 
                                     align: "left"
