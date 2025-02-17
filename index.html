@@ -972,6 +972,14 @@ combineAndSortFiles = (fileContents) => {
 
         // Use setTimeout to simulate a delay for processing the CSV
         setTimeout(function() {
+
+	  // Check if jsonData is an array and has at least one element
+	  if (!Array.isArray(jsonData) || jsonData.length === 0) {
+	     webix.message({type:"error", text:"Form data are Invalid",  expire: 5000,});
+	     datatable.hideProgress();
+	     return;
+	  }
+
           // Extract column names dynamically from JSON data
           let columns = Object.keys(jsonData[0]).map(key => ({
             id: key,
